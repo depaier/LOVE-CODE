@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LOVE-CODE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      body {
+        /* 2. font-family를 'Nanum Brush Script'로 변경 */
+        font-family: "Nanum Brush Script", cursive;
+        background-color: #fdfaf3;
+        background-size: cover; /* 이미지가 화면 전체를 덮도록 설정 */
+        background-position: center;
+        background-attachment: fixed;
+        color: #3a3a3a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      .container {
+        background-color: #ffffff;
+        padding: 40px;
+        border: 3px solid #8a6d59;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+        width: 100%;
+        max-width: 500px;
+        text-align: center;
+        animation: fadeIn 0.8s ease-out;
+      }
+      h1 {
+        font-size: 3em; /* 폰트에 맞게 크기 살짝 조정 */
+        color: #5a3a22;
+        margin-bottom: 30px;
+      }
+      .form-group {
+        margin-bottom: 25px;
+        text-align: left;
+      }
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 1.5em; /* 폰트에 맞게 크기 살짝 조정 */
+        color: #5a3a22;
+      }
+      input {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-bottom: 2px solid #bda08c;
+        border-radius: 0;
+        background-color: transparent;
+        font-size: 1.5em; /* 폰트에 맞게 크기 살짝 조정 */
+        /* 2. 입력창 폰트도 변경 */
+        font-family: "Nanum Brush Script", cursive;
+        transition: border-color 0.3s;
+      }
+      input:focus {
+        border-color: #a84448;
+        outline: none;
+        box-shadow: none;
+      }
+      button {
+        width: 100%;
+        padding: 15px;
+        background-color: #a84448;
+        color: #fdfaf3;
+        border: none;
+        border-radius: 4px;
+        font-size: 1.8em; /* 폰트에 맞게 크기 살짝 조정 */
+        /* 2. 버튼 폰트도 변경 */
+        font-family: "Nanum Brush Script", cursive;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      button:hover {
+        background-color: #8c383b;
+      }
+      #result-area {
+        margin-top: 30px;
+        padding: 20px;
+        border-top: 1px solid #e0e0e0;
+        text-align: left;
+        line-height: 1.8;
+        font-size: 1.3em; /* 폰트에 맞게 크기 살짝 조정 */
+        min-height: 100px;
+      }
+      #result-text {
+        white-space: pre-wrap;
+        opacity: 0;
+      }
+      #result-text.visible {
+        animation: fadeIn 1s ease-out forwards;
+      }
+      #loader {
+        display: none;
+        margin: 20px auto;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #a84448;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>LOVE-CODE</h1>
+      <form id="saju-form">
+        <div class="form-group">
+          <label for="name">이름</label
+          ><input type="text" id="name" required placeholder="예: 홍길동" />
+        </div>
+        <div class="form-group">
+          <label for="studentId">학번</label
+          ><input
+            type="text"
+            id="studentId"
+            required
+            placeholder="예: 20240001"
+          />
+        </div>
+        <div class="form-group">
+          <label for="birthdate">생년월일</label
+          ><input type="date" id="birthdate" required value="2000-01-01" />
+        </div>
+        <div class="form-group">
+          <label for="hour">태어난 시 (時)</label
+          ><input
+            type="number"
+            id="hour"
+            required
+            placeholder="0~23 사이 숫자"
+          />
+        </div>
+        <div class="form-group">
+          <label for="mbti">MBTI</label
+          ><input type="text" id="mbti" required placeholder="예: ENFP" />
+        </div>
+        <button type="submit">결과 보기</button>
+      </form>
+      <div id="result-area">
+        <div id="loader"></div>
+        <div id="result-text"></div>
+      </div>
+    </div>
+    <script>
+      const sajuForm = document.getElementById("saju-form");
+      const loader = document.getElementById("loader");
+      const resultText = document.getElementById("result-text");
+      sajuForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        loader.style.display = "block";
+        resultText.textContent = "";
+        resultText.classList.remove("visible");
+        const birthdate = document.getElementById("birthdate").value;
+        const birthDateObj = new Date(birthdate);
+        const data = {
+          name: document.getElementById("name").value,
+          studentId: document.getElementById("studentId").value,
+          year: birthDateObj.getFullYear(),
+          month: birthDateObj.getMonth() + 1, // getMonth()는 0부터 시작하므로 +1
+          day: birthDateObj.getDate(),
+          hour: parseInt(document.getElementById("hour").value),
+          mbti: document.getElementById("mbti").value,
+        };
+        try {
+          const response = await fetch("/saju", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+          const result = await response.json();
+          if (response.ok) {
+            resultText.textContent = result.ai_analysis;
+          } else {
+            resultText.textContent = "오류가 발생했습니다: " + result.error;
+          }
+        } catch (error) {
+          resultText.textContent =
+            "서버와 통신하는 데 실패했습니다. 서버가 켜져 있는지 확인해주세요.";
+        } finally {
+          loader.style.display = "none";
+          resultText.classList.add("visible");
+        }
+      });
+    </script>
+  </body>
+</html>
