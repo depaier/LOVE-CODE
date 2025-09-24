@@ -952,6 +952,9 @@ def analyze_saju():
         "ai_analysis": ai_response
     })
 
+# Vercel에서 사용할 WSGI 애플리케이션
+
+# 로컬 개발용 코드 (Vercel에서는 실행되지 않음)
 if __name__ == '__main__':
     # 시작 시 API 키 상태 확인
     if GOOGLE_API_KEY:
