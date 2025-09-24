@@ -1,7 +1,11 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import google.generativeai as genai
 import sqlite3
+from dotenv import load_dotenv
+import os
 
+# 환경변수 로딩
+load_dotenv()
 
 # --- [사주 계산 함수 부분 - 이전과 동일] ---
 def calculate_saju_pillars(year, month, day, hour):
@@ -43,11 +47,10 @@ def calculate_saju_pillars(year, month, day, hour):
 # --- [사주 계산 함수 부분 끝] ---
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here-change-this-in-production'
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here-change-this-in-production')
 
 # Gemini API 키 설정
-import os
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY') or 'AIzaSyDfhcw_5uZz-qlqJDi0YgF55FWHe7ffuZc'  # 여기에 유효한 API 키를 입력하세요
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 if GOOGLE_API_KEY == 'YOUR_NEW_API_KEY_HERE' or not GOOGLE_API_KEY:
     print("⚠️  GOOGLE_API_KEY가 설정되지 않았습니다.")
