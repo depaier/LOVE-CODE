@@ -15,11 +15,43 @@ cursor.execute('''
         student_id INTEGER NOT NULL,
         name TEXT NOT NULL,
         mbti TEXT NOT NULL,
+        instagram_id TEXT NOT NULL,
         saju_result TEXT NOT NULL,
         ai_analysis TEXT NOT NULL,
+        is_matched BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
 ''')
+
+# 기존 테이블에 is_matched 컬럼이 있는지 확인하고 없으면 추가
+try:
+    cursor.execute("SELECT is_matched FROM results LIMIT 1")
+except sqlite3.OperationalError:
+    # is_matched 컬럼이 없으면 추가
+    cursor.execute("ALTER TABLE results ADD COLUMN is_matched BOOLEAN DEFAULT FALSE")
+
+# 기존 테이블에 gender 컬럼이 있는지 확인하고 없으면 추가
+try:
+    cursor.execute("SELECT gender FROM results LIMIT 1")
+except sqlite3.OperationalError:
+    # gender 컬럼이 없으면 추가 (MALE, FEMALE)
+    cursor.execute("ALTER TABLE results ADD COLUMN gender TEXT DEFAULT ''")
+
+# 매칭 결과를 저장할 테이블 생성
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS matches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user1_id INTEGER NOT NULL,
+        user2_id INTEGER NOT NULL,
+        compatibility_score INTEGER NOT NULL,
+        matching_reason TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user1_id) REFERENCES results(id),
+        FOREIGN KEY (user2_id) REFERENCES results(id),
+        UNIQUE(user1_id, user2_id)
+    )
+''')
+
 
 # 변경 사항을 데이터베이스에 저장(commit)합니다.
 connection.commit()
@@ -27,4 +59,4 @@ connection.commit()
 # 연결을 닫습니다.
 connection.close()
 
-print("데이터베이스와 테이블이 성공적으로 생성되었습니다. 'saju_results.db' 파일을 확인하세요.")
+print("데이터베이스와 테이블이 성공적으로 생성/업데이트되었습니다. 'saju_results.db' 파일을 확인하세요.")
