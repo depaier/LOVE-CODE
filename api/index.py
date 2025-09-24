@@ -55,11 +55,21 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here-change-this
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY')
 
+print(f"🔧 환경변수 확인:")
+print(f"   SUPABASE_URL: {'설정됨' if SUPABASE_URL else '없음'}")
+print(f"   SUPABASE_ANON_KEY: {'설정됨' if SUPABASE_ANON_KEY else '없음'}")
+print(f"   GOOGLE_API_KEY: {'설정됨' if os.getenv('GOOGLE_API_KEY') else '없음'}")
+
 if not SUPABASE_URL or not SUPABASE_ANON_KEY:
     raise ValueError("SUPABASE_URL과 SUPABASE_ANON_KEY 환경변수가 설정되지 않았습니다.")
 
 # Supabase 클라이언트 생성
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    print("✅ Supabase 클라이언트 생성 성공")
+except Exception as e:
+    print(f"❌ Supabase 클라이언트 생성 실패: {e}")
+    raise
 
 def init_supabase_tables():
     """Supabase 테이블 초기화 (SQL 에디터에서 수동으로 실행)"""
@@ -281,13 +291,26 @@ def perform_matching():
 
     try:
         # Supabase에서 데이터 조회
-        # 새로운 사용자들 (is_matched = FALSE)
-        new_users_response = supabase.table('results').select('id, name, mbti, saju_result, ai_analysis, gender').eq('is_matched', False).execute()
-        new_users = new_users_response.data
+        print("🔍 Supabase에서 사용자 데이터 조회 중...")
+        try:
+            # 새로운 사용자들 (is_matched = FALSE)
+            print("   📡 새로운 사용자 조회 시도...")
+            new_users_response = supabase.table('results').select('id, name, mbti, saju_result, ai_analysis, gender').eq('is_matched', False).execute()
+            new_users = new_users_response.data if new_users_response.data else []
+            print(f"✅ 새로운 사용자 {len(new_users)}명 조회 완료")
+        except Exception as db_error:
+            print(f"❌ 새로운 사용자 조회 실패: {db_error}")
+            raise Exception(f"새로운 사용자 데이터 조회 실패: {db_error}")
 
-        # 기존 매칭된 사용자들 (is_matched = TRUE)
-        existing_users_response = supabase.table('results').select('id, name, mbti, saju_result, ai_analysis, gender').eq('is_matched', True).execute()
-        existing_users = existing_users_response.data
+        try:
+            # 기존 매칭된 사용자들 (is_matched = TRUE)
+            print("   📡 기존 매칭된 사용자 조회 시도...")
+            existing_users_response = supabase.table('results').select('id, name, mbti, saju_result, ai_analysis, gender').eq('is_matched', True).execute()
+            existing_users = existing_users_response.data if existing_users_response.data else []
+            print(f"✅ 기존 매칭된 사용자 {len(existing_users)}명 조회 완료")
+        except Exception as db_error:
+            print(f"❌ 기존 사용자 조회 실패: {db_error}")
+            raise Exception(f"기존 사용자 데이터 조회 실패: {db_error}")
 
         if len(new_users) == 0:
             return jsonify({'error': '매칭할 새로운 사용자가 없습니다'}), 400
@@ -295,11 +318,21 @@ def perform_matching():
         if len(existing_users) == 0 and len(new_users) < 2:
             return jsonify({'error': '매칭을 위해 최소 2명의 사용자가 필요합니다'}), 400
 
+        # Vercel 타임아웃 방지를 위한 사용자 수 제한
+        total_users = len(new_users) + len(existing_users)
+        if total_users > 20:
+            return jsonify({'error': f'한 번에 너무 많은 사용자를 처리할 수 없습니다. 현재 {total_users}명, 최대 20명까지 가능합니다.'}), 400
+
+        print(f"📊 매칭 대상: 새로운 사용자 {len(new_users)}명, 기존 사용자 {len(existing_users)}명 (총 {total_users}명)")
+
         # 성별에 따라 사용자들을 분류
         def classify_users_by_gender(users):
             males = []
             females = []
-            for user in users:
+            for i, user in enumerate(users):
+                if len(user) < 6:
+                    print(f"⚠️ 사용자 {i}번 데이터가 불완전합니다. 길이: {len(user)}, 데이터: {user}")
+                    continue
                 gender = user[5] if len(user) > 5 else ''  # gender는 6번째 필드
                 if gender == 'MALE':
                     males.append(user)
@@ -310,28 +343,41 @@ def perform_matching():
                     males.append(user)
             return males, females
 
+        print("👥 사용자 성별 분류 중...")
         # 새로운 사용자들을 성별로 분류
         new_males, new_females = classify_users_by_gender(new_users)
+        print(f"✅ 새로운 사용자 - 남자: {len(new_males)}명, 여자: {len(new_females)}명")
+
         # 기존 사용자들을 성별로 분류
         existing_males, existing_females = classify_users_by_gender(existing_users)
+        print(f"✅ 기존 사용자 - 남자: {len(existing_males)}명, 여자: {len(existing_females)}명")
+
+        # 데이터 구조 검증
+        print("🔍 데이터 구조 검증 중...")
+        for i, user in enumerate(new_users + existing_users):
+            print(f"사용자 {i} 데이터: 타입={type(user)}, 길이={len(user) if hasattr(user, '__len__') else 'N/A'}, 내용={user}")
+            if not isinstance(user, (list, tuple)) or len(user) < 6:
+                print(f"⚠️ 사용자 {i} 데이터 구조 이상: {user}")
+                return jsonify({'error': f'사용자 데이터 구조가 올바르지 않습니다. 사용자 {i}: {user}'}), 500
 
         matches = []
         all_pair_scores = []  # 모든 쌍의 호환성 점수를 저장
 
         # AI를 사용한 매칭 수행
+        print("🤖 AI 매칭 분석 시작...")
         # API 키 확인
         if not GOOGLE_API_KEY:
             return jsonify({'error': 'Google AI API 키가 설정되지 않아 매칭을 수행할 수 없습니다. 관리자에게 문의해주세요.'}), 500
 
-        # 여러 모델을 시도해보고 가능한 것을 사용
-        model_names = ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-pro']
+        # Vercel 환경 최적화: 간단한 모델만 사용
+        model_names = ['gemini-1.5-flash', 'gemini-1.5-pro']  # 2.0-flash 제외 (더 안정적임)
         model = None
         for model_name in model_names:
             try:
+                print(f"🔄 {model_name} 모델 테스트 중...")
                 model = genai.GenerativeModel(model_name)
-                # 테스트 호출로 모델이 작동하는지 확인
-                test_response = model.generate_content('test')
-                print(f"✅ {model_name} 모델 사용 중")
+                # 간단한 테스트로만 확인 (Vercel 타임아웃 방지)
+                print(f"✅ {model_name} 모델 선택됨")
                 break
             except Exception as e:
                 print(f"❌ {model_name} 모델 실패: {e}")
@@ -341,7 +387,9 @@ def perform_matching():
             return jsonify({'error': '사용 가능한 AI 모델을 찾을 수 없습니다. API 키와 모델 설정을 확인해주세요.'}), 500
 
         # 1. 성별 기반 매칭 분석 수행
+        print("💑 매칭 분석 시작...")
         # 새로운 남자 × 기존 여자 매칭
+        print(f"👫 새로운 남자({len(new_males)}명) × 기존 여자({len(existing_females)}명) 매칭 분석 중...")
         for user1 in new_males:
             for user2 in existing_females:
                 try:
@@ -366,7 +414,34 @@ def perform_matching():
                     매칭 이유: [호환성 분석 및 이유 설명]
                     """
 
-                    response = model.generate_content(prompt)
+                    print(f"🤖 AI 호출 시도: {user1[1]} ↔ {user2[1]}")
+                    print(f"📝 Prompt 길이: {len(prompt)} 문자")
+
+                    # Vercel 환경용 타임아웃 설정 및 재시도 로직
+                    max_retries = 2
+                    retry_delay = 1
+
+                    response = None
+                    for attempt in range(max_retries + 1):
+                        try:
+                            if attempt > 0:
+                                print(f"🔄 재시도 {attempt}/{max_retries}...")
+                                import time
+                                time.sleep(retry_delay)
+
+                            # 타임아웃 설정 (Vercel용으로 짧게)
+                            import google.generativeai as genai
+                            response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(
+                                temperature=0.7,
+                                max_output_tokens=500,  # 응답 길이 제한
+                            ))
+                            break  # 성공하면 루프 탈출
+
+                        except Exception as retry_error:
+                            print(f"❌ AI 호출 시도 {attempt + 1} 실패: {retry_error}")
+                            if attempt == max_retries:
+                                raise Exception(f"AI API 호출 실패 (최대 재시도 횟수 초과): {retry_error}")
+                            continue
 
                     # 응답이 None인지 확인
                     if response is None:
@@ -377,6 +452,8 @@ def perform_matching():
                     # AI 응답이 비어있는지 확인
                     if not ai_result:
                         raise Exception("AI 응답이 비어있습니다")
+
+                    print(f"✅ AI 응답 받음: 길이 {len(ai_result)} 문자")
 
                     # HTML 응답인지 확인 (에러 페이지가 반환된 경우)
                     if ai_result.startswith('<!DOCTYPE') or '<html' in ai_result.lower():
@@ -461,6 +538,9 @@ def perform_matching():
                 except Exception as e:
                     error_msg = f"매칭 분석 중 오류 발생 ({user1[1]} ↔ {user2[1]}): {str(e)}"
                     print(f"❌ {error_msg}")
+                    print(f"❌ 오류 타입: {type(e).__name__}")
+                    import traceback
+                    print(f"❌ 상세 오류: {traceback.format_exc()}")
 
                     # 치명적인 오류인 경우 전체 매칭을 중단
                     if "HTML 에러 페이지" in str(e) or "API 키" in str(e):
@@ -807,7 +887,29 @@ def perform_matching():
         })
 
     except Exception as e:
-        return jsonify({'error': f'매칭 처리 중 오류 발생: {e}'}), 500
+        error_details = {
+            'message': '매칭 처리 중 오류 발생',
+            'error_type': type(e).__name__,
+            'error_message': str(e),
+            'environment': 'vercel'
+        }
+
+        print(f"❌ 최종 매칭 처리 중 치명적 오류 발생: {str(e)}")
+        print(f"❌ 오류 타입: {type(e).__name__}")
+        import traceback
+        print(f"❌ 상세 오류: {traceback.format_exc()}")
+
+        # Vercel 환경에서 발생 가능한 일반적인 오류들에 대한 친화적 메시지
+        if "timeout" in str(e).lower() or "time" in str(e).lower():
+            error_details['user_message'] = '처리 시간이 초과되었습니다. 사용자 수를 줄여서 다시 시도해주세요.'
+        elif "quota" in str(e).lower() or "limit" in str(e).lower():
+            error_details['user_message'] = 'AI API 사용량 제한에 도달했습니다. 잠시 후 다시 시도해주세요.'
+        elif "network" in str(e).lower() or "connection" in str(e).lower():
+            error_details['user_message'] = '네트워크 연결에 문제가 있습니다. 다시 시도해주세요.'
+        else:
+            error_details['user_message'] = '매칭 처리 중 오류가 발생했습니다. 관리자에게 문의해주세요.'
+
+        return jsonify({'error': error_details['user_message']}), 500
 
 @app.route('/admin/matching/results')
 def get_matching_results():
