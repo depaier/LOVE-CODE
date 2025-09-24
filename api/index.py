@@ -457,7 +457,6 @@ def perform_matching():
                                 time.sleep(retry_delay)
 
                             # 타임아웃 설정 (Vercel용으로 짧게)
-                            import google.generativeai as genai
                             response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(
                                 temperature=0.7,
                                 max_output_tokens=500,  # 응답 길이 제한
