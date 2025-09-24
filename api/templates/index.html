@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LOVE-CODE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      body {
+        /* 2. font-family를 'Nanum Brush Script'로 변경 */
+        font-family: "Nanum Brush Script", cursive;
+        background-color: #fdfaf3;
+        background-size: cover; /* 이미지가 화면 전체를 덮도록 설정 */
+        background-position: center;
+        background-attachment: fixed;
+        color: #3a3a3a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      .container {
+        background-color: #ffffff;
+        padding: 40px;
+        border: 3px solid #8a6d59;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+        width: 100%;
+        max-width: 500px;
+        text-align: center;
+        animation: fadeIn 0.8s ease-out;
+      }
+      h1 {
+        font-size: 3em; /* 폰트에 맞게 크기 살짝 조정 */
+        color: #5a3a22;
+        margin-bottom: 30px;
+      }
+      .form-group {
+        margin-bottom: 25px;
+        text-align: left;
+      }
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 1.5em; /* 폰트에 맞게 크기 살짝 조정 */
+        color: #5a3a22;
+      }
+      input {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-bottom: 2px solid #bda08c;
+        border-radius: 0;
+        background-color: transparent;
+        font-size: 1.5em; /* 폰트에 맞게 크기 살짝 조정 */
+        /* 2. 입력창 폰트도 변경 */
+        font-family: "Nanum Brush Script", cursive;
+        transition: border-color 0.3s;
+      }
+      input:focus {
+        border-color: #a84448;
+        outline: none;
+        box-shadow: none;
+      }
+
+      select:focus {
+        border-color: #a84448;
+        outline: none;
+        box-shadow: none;
+      }
+      button {
+        width: 100%;
+        padding: 15px;
+        background-color: #a84448;
+        color: #fdfaf3;
+        border: none;
+        border-radius: 4px;
+        font-size: 1.8em; /* 폰트에 맞게 크기 살짝 조정 */
+        /* 2. 버튼 폰트도 변경 */
+        font-family: "Nanum Brush Script", cursive;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+      button:hover {
+        background-color: #8c383b;
+      }
+
+      /* 체크박스 스타일 */
+      .checkbox-group {
+        text-align: left;
+        margin-bottom: 20px;
+      }
+
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        font-size: 1.3em;
+        color: #5a3a22;
+        position: relative;
+        padding-left: 35px;
+        line-height: 1.4;
+      }
+
+      .checkbox-label input[type="checkbox"] {
+        position: absolute;
+        opacity: 0;
+        cursor: pointer;
+        height: 0;
+        width: 0;
+      }
+
+      .checkmark {
+        position: absolute;
+        top: 2px;
+        left: 0;
+        height: 20px;
+        width: 20px;
+        background-color: #ffffff;
+        border: 2px solid #bda08c;
+        border-radius: 3px;
+        transition: all 0.3s;
+      }
+
+      .checkbox-label input[type="checkbox"]:checked ~ .checkmark {
+        background-color: #a84448;
+        border-color: #a84448;
+      }
+
+      .checkmark:after {
+        content: "";
+        position: absolute;
+        display: none;
+        left: 6px;
+        top: 2px;
+        width: 6px;
+        height: 10px;
+        border: solid white;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+      }
+
+      .checkbox-label input[type="checkbox"]:checked ~ .checkmark:after {
+        display: block;
+      }
+
+      .privacy-link {
+        color: #a84448;
+        text-decoration: none;
+        font-weight: bold;
+        transition: color 0.3s;
+        margin: 0 4px;
+      }
+
+      .privacy-link:hover {
+        color: #8c383b;
+        text-decoration: underline;
+      }
+
+      /* 체크박스 필수 표시 */
+      .checkbox-label::after {
+        content: " *";
+        color: #a84448;
+        font-weight: bold;
+        margin-left: 2px;
+      }
+
+      /* 테스트 버튼 스타일 */
+      #test-modal-btn:hover {
+        background-color: #555 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+      /* 모달 관련 스타일 */
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        animation: fadeIn 0.3s ease-out;
+      }
+      .modal-content {
+        background-color: #ffffff;
+        margin: 5% auto;
+        padding: 20px;
+        border: 3px solid #8a6d59;
+        border-radius: 8px;
+        width: calc(100% - 20px);
+        max-width: 600px;
+        max-height: 85vh;
+        overflow-y: auto;
+        animation: fadeIn 0.5s ease-out;
+        position: relative;
+      }
+      .close {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 2em;
+        font-weight: bold;
+        cursor: pointer;
+        color: #5a3a22;
+        transition: all 0.3s;
+        z-index: 1001;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #8a6d59;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        -webkit-tap-highlight-color: transparent;
+      }
+      .close:hover,
+      .close:active {
+        color: #a84448;
+        background: rgba(168, 68, 72, 0.1);
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+      .loading-message {
+        text-align: center;
+        color: #5a3a22;
+        font-size: 1.3em;
+        margin: 20px 0;
+        display: none;
+      }
+      .loading-message.visible {
+        display: block;
+      }
+      #result-text {
+        white-space: pre-wrap;
+        line-height: 1.8;
+        font-size: 1.4em;
+        color: #3a3a3a;
+        margin-top: 20px;
+        display: none;
+      }
+      #result-text.visible {
+        display: block;
+      }
+      #loader {
+        display: none;
+        margin: 20px auto;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #a84448;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+      }
+
+      /* 모바일 반응형 스타일 */
+      @media (max-width: 768px) {
+        .modal-content {
+          margin: 2% auto;
+          padding: 15px;
+          width: calc(100% - 10px);
+          max-height: 90vh;
+        }
+        .close {
+          top: 8px;
+          right: 12px;
+          font-size: 1.8em;
+          width: 45px;
+          height: 45px;
+          border: 2px solid #8a6d59;
+        }
+        #result-text {
+          font-size: 1.2em;
+        }
+        .loading-message {
+          font-size: 1.1em;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .modal-content {
+          margin: 1% auto;
+          padding: 10px;
+          width: calc(100% - 5px);
+          border-radius: 4px;
+        }
+        .close {
+          top: 5px;
+          right: 8px;
+          font-size: 2em;
+          width: 50px;
+          height: 50px;
+          border: 2px solid #8a6d59;
+          background: rgba(255, 255, 255, 0.95);
+        }
+        #result-text {
+          font-size: 1.1em;
+          margin-top: 15px;
+        }
+        .loading-message {
+          font-size: 1em;
+          margin: 15px 0;
+        }
+        .checkbox-label {
+          font-size: 1.1em;
+          padding-left: 30px;
+        }
+        .checkmark {
+          height: 18px;
+          width: 18px;
+        }
+        .checkmark:after {
+          left: 5px;
+          top: 1px;
+          width: 5px;
+          height: 9px;
+        }
+      }
+
+      /* 작은 모바일 기기 (320px 이하) */
+      @media (max-width: 320px) {
+        .close {
+          top: 3px;
+          right: 5px;
+          font-size: 2.2em;
+          width: 50px;
+          height: 50px;
+          background: rgba(255, 255, 255, 1);
+          border: 3px solid #8a6d59;
+          box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+        .modal-content {
+          margin: 0.5% auto;
+          padding: 8px;
+          width: calc(100% - 3px);
+        }
+        .checkbox-label {
+          font-size: 1em;
+          padding-left: 28px;
+        }
+        .checkmark {
+          height: 16px;
+          width: 16px;
+        }
+        .checkmark:after {
+          left: 4px;
+          top: 1px;
+          width: 4px;
+          height: 7px;
+        }
+      }
+
+      /* 터치 디바이스 최적화 */
+      @media (hover: none) and (pointer: coarse) {
+        .close {
+          width: 48px;
+          height: 48px;
+          font-size: 2.2em;
+          background: rgba(255, 255, 255, 1);
+          border: 3px solid #8a6d59;
+        }
+        .close:active {
+          transform: scale(0.95);
+          background: rgba(168, 68, 72, 0.15);
+        }
+        .checkmark {
+          height: 24px;
+          width: 24px;
+        }
+        .checkbox-label {
+          padding-left: 32px;
+          min-height: 24px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>LOVE-CODE</h1>
+
+      <!-- 테스트 버튼 -->
+      <div style="text-align: center; margin-bottom: 20px">
+        <button
+          type="button"
+          id="test-modal-btn"
+          style="
+            background-color: #666;
+            color: #fff;
+            border: 2px solid #8a6d59;
+            border-radius: 6px;
+            padding: 10px 20px;
+            font-size: 1em;
+            font-family: 'Nanum Brush Script', cursive;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          "
+        >
+          🎯 테스트 모달 보기
+        </button>
+      </div>
+
+      <form id="saju-form">
+        <div class="form-group">
+          <label for="name">이름</label
+          ><input type="text" id="name" required placeholder="예: 홍길동" />
+        </div>
+        <div class="form-group">
+          <label for="studentId">학번</label
+          ><input
+            type="number"
+            id="studentId"
+            required
+            placeholder="예: 20240001"
+          />
+        </div>
+        <div class="form-group">
+          <label for="birthdate">생년월일</label
+          ><input type="date" id="birthdate" required value="2000-01-01" />
+        </div>
+        <div class="form-group">
+          <label for="hour">태어난 시 (時)</label
+          ><input
+            type="number"
+            id="hour"
+            required
+            placeholder="0~23 사이 숫자"
+          />
+        </div>
+        <div class="form-group">
+          <label for="mbti">MBTI</label
+          ><input type="text" id="mbti" required placeholder="예: ENFP" />
+        </div>
+        <div class="form-group">
+          <label for="gender">성별</label>
+          <select
+            id="gender"
+            required
+            style="
+              width: 100%;
+              padding: 10px;
+              border: none;
+              border-bottom: 2px solid #bda08c;
+              border-radius: 0;
+              background-color: transparent;
+              font-size: 1.5em;
+              font-family: 'Nanum Brush Script', cursive;
+              transition: border-color 0.3s;
+              color: #3a3a3a;
+            "
+          >
+            <option value="">선택해주세요</option>
+            <option value="MALE">남성</option>
+            <option value="FEMALE">여성</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="instagramId"
+            >인스타그램 아이디
+            <span style="color: #a84448; font-weight: bold">*</span></label
+          >
+          <input
+            type="text"
+            id="instagramId"
+            required
+            placeholder="예: @my_instagram"
+          />
+        </div>
+
+        <!-- 개인정보 동의 체크박스 -->
+        <div class="form-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="privacyConsent" required />
+            <span class="checkmark"></span>
+            <a
+              href="https://stealth-panther-e75.notion.site/LOVE-CODE-2732cfa1c19a801aa39fc751c2bbd923?source=copy_link"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="privacy-link"
+            >
+              개인정보 처리방침 </a
+            >에 동의합니다
+          </label>
+        </div>
+
+        <button type="submit">결과 보기</button>
+      </form>
+    </div>
+
+    <!-- 모달 창 -->
+    <div id="result-modal" class="modal">
+      <div class="modal-content">
+        <span class="close" title="닫기">&times;</span>
+        <h2 style="color: #5a3a22; margin-bottom: 20px; text-align: center">
+          사주 분석 결과
+        </h2>
+        <div class="loading-message" id="loading-message">
+          🔮 사주를 분석하고 있습니다...
+        </div>
+        <div id="loader"></div>
+        <div id="result-text"></div>
+      </div>
+    </div>
+    <script>
+      const sajuForm = document.getElementById("saju-form");
+      const testBtn = document.getElementById("test-modal-btn");
+      const modal = document.getElementById("result-modal");
+      const loader = document.getElementById("loader");
+      const resultText = document.getElementById("result-text");
+      const loadingMessage = document.getElementById("loading-message");
+      const closeBtn = document.getElementsByClassName("close")[0];
+
+      // 모달창 열기 함수
+      function openModal() {
+        modal.style.display = "block";
+        document.body.style.overflow = "hidden"; // 배경 스크롤 방지
+      }
+
+      // 모달창 닫기 함수
+      function closeModal() {
+        modal.style.display = "none";
+        document.body.style.overflow = "auto"; // 배경 스크롤 복원
+        resultText.textContent = "";
+        resultText.classList.remove("visible");
+        loadingMessage.classList.remove("visible");
+        loader.style.display = "none";
+      }
+
+      // 테스트 모달 열기 함수
+      function openTestModal() {
+        openModal();
+        showResult(
+          "🎯 테스트 모달입니다!\n\n이 모달창은 실제 사주 분석 없이\nUI/UX를 테스트하기 위한 용도입니다.\n\n닫기 버튼과 ESC 키로 닫을 수 있습니다."
+        );
+      }
+
+      // 로딩 상태 표시 함수
+      function showLoading() {
+        loadingMessage.classList.add("visible");
+        loader.style.display = "block";
+        resultText.classList.remove("visible");
+      }
+
+      // 로딩 완료 후 결과 표시 함수
+      function showResult(result) {
+        loadingMessage.classList.remove("visible");
+        loader.style.display = "none";
+        resultText.textContent = result;
+        resultText.classList.add("visible");
+      }
+
+      // 테스트 버튼 클릭 이벤트
+      testBtn.onclick = function () {
+        openTestModal();
+      };
+
+      // 닫기 버튼 클릭 이벤트 (모바일 터치 지원)
+      closeBtn.onclick = function () {
+        closeModal();
+      };
+
+      // 모바일 터치 이벤트 지원
+      closeBtn.addEventListener(
+        "touchstart",
+        function (e) {
+          e.preventDefault();
+          closeModal();
+        },
+        { passive: false }
+      );
+
+      // 모달 외부 클릭 시 닫기 (터치 지원)
+      function handleModalClose(event) {
+        if (event.target == modal) {
+          closeModal();
+        }
+      }
+
+      window.onclick = handleModalClose;
+      window.addEventListener("touchend", handleModalClose, { passive: true });
+
+      // ESC 키로 모달 닫기
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && modal.style.display === "block") {
+          closeModal();
+        }
+      });
+
+      sajuForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        // 성별 선택 확인
+        const gender = document.getElementById("gender").value;
+        if (!gender) {
+          alert("성별을 선택해주세요.");
+          document.getElementById("gender").focus();
+          return;
+        }
+
+        // 인스타그램 아이디 유효성 검사
+        const instagramId = document.getElementById("instagramId").value.trim();
+        if (!instagramId) {
+          alert("인스타그램 아이디를 입력해주세요.");
+          document.getElementById("instagramId").focus();
+          return;
+        }
+
+        // 인스타그램 아이디 형식 검사 (@로 시작하는지 확인)
+        if (!instagramId.startsWith("@")) {
+          alert("인스타그램 아이디는 @로 시작해야 합니다.\n예: @my_instagram");
+          document.getElementById("instagramId").focus();
+          return;
+        }
+
+        // 개인정보 동의 체크 확인
+        const privacyConsent = document.getElementById("privacyConsent");
+        if (!privacyConsent.checked) {
+          alert("개인정보 처리방침에 동의해주세요.");
+          privacyConsent.focus();
+          return;
+        }
+
+        // 모달 열기 및 로딩 상태 표시
+        openModal();
+        showLoading();
+
+        const birthdate = document.getElementById("birthdate").value;
+        const birthDateObj = new Date(birthdate);
+        const data = {
+          name: document.getElementById("name").value,
+          studentId: document.getElementById("studentId").value,
+          year: birthDateObj.getFullYear(),
+          month: birthDateObj.getMonth() + 1, // getMonth()는 0부터 시작하므로 +1
+          day: birthDateObj.getDate(),
+          hour: parseInt(document.getElementById("hour").value),
+          mbti: document.getElementById("mbti").value,
+          gender: document.getElementById("gender").value,
+          instagramId: document.getElementById("instagramId").value,
+        };
+
+        try {
+          const response = await fetch("/saju", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+          const result = await response.json();
+          if (response.ok) {
+            showResult(result.ai_analysis);
+          } else {
+            showResult("오류가 발생했습니다: " + result.error);
+          }
+        } catch (error) {
+          showResult(
+            "서버와 통신하는 데 실패했습니다. 서버가 켜져 있는지 확인해주세요."
+          );
+        }
+      });
+    </script>
+  </body>
+</html>
