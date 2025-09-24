@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import google.generativeai as genai
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 import os
 
@@ -46,57 +47,75 @@ def calculate_saju_pillars(year, month, day, hour):
     return year_pillar, month_pillar, day_pillar, time_pillar
 # --- [사주 계산 함수 부분 끝] ---
 
-app = Flask(__name__)
+app = Flask(__name__,
+            template_folder='templates',
+            static_folder='static')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here-change-this-in-production')
 
-# 데이터베이스 경로 설정 (Vercel에서는 메모리 사용)
-DATABASE_URL = os.getenv('DATABASE_URL', 'saju_results.db')
-if os.getenv('VERCEL_ENV'):  # Vercel 환경에서는 메모리 데이터베이스 사용
-    DATABASE_URL = ':memory:'
+# PostgreSQL 데이터베이스 연결 설정
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL 환경변수가 설정되지 않았습니다. Vercel Postgres 연결 문자열을 설정해주세요.")
 
 def get_db_connection():
-    """데이터베이스 연결을 반환하고 필요한 경우 테이블 생성"""
-    conn = sqlite3.connect(DATABASE_URL)
-    if DATABASE_URL == ':memory:':
-        # 메모리 데이터베이스의 경우 테이블 생성
-        init_memory_db(conn)
-    return conn
+    """PostgreSQL 데이터베이스 연결을 반환"""
+    try:
+        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    except Exception as e:
+        print(f"❌ 데이터베이스 연결 실패: {e}")
+        raise
 
-def init_memory_db(conn):
-    """메모리 데이터베이스용 테이블 초기화"""
-    cursor = conn.cursor()
+def init_postgres_db():
+    """PostgreSQL 데이터베이스 테이블 초기화"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    # results 테이블 생성
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS results (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id TEXT NOT NULL UNIQUE,
-            name TEXT NOT NULL,
-            mbti TEXT,
-            instagram_id TEXT,
-            saju_result TEXT,
-            ai_analysis TEXT,
-            gender TEXT,
-            is_matched BOOLEAN DEFAULT FALSE,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+        # results 테이블 생성
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS results (
+                id SERIAL PRIMARY KEY,
+                student_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                mbti TEXT NOT NULL,
+                instagram_id TEXT NOT NULL,
+                saju_result TEXT NOT NULL,
+                ai_analysis TEXT NOT NULL,
+                is_matched BOOLEAN DEFAULT FALSE,
+                gender TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
 
-    # matches 테이블 생성
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS matches (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user1_id INTEGER NOT NULL,
-            user2_id INTEGER NOT NULL,
-            compatibility_score INTEGER NOT NULL,
-            matching_reason TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user1_id) REFERENCES results (id),
-            FOREIGN KEY (user2_id) REFERENCES results (id)
-        )
-    ''')
+        # matches 테이블 생성
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS matches (
+                id SERIAL PRIMARY KEY,
+                user1_id INTEGER NOT NULL REFERENCES results(id) ON DELETE CASCADE,
+                user2_id INTEGER NOT NULL REFERENCES results(id) ON DELETE CASCADE,
+                compatibility_score INTEGER NOT NULL,
+                matching_reason TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user1_id, user2_id)
+            )
+        ''')
 
-    conn.commit()
+        # 인덱스 생성
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_results_student_id ON results(student_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_results_is_matched ON results(is_matched)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_matches_user1_id ON matches(user1_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_matches_user2_id ON matches(user2_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_matches_score ON matches(compatibility_score DESC)')
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        print("✅ PostgreSQL 데이터베이스 초기화 완료")
+
+    except Exception as e:
+        print(f"❌ PostgreSQL 데이터베이스 초기화 실패: {e}")
+        raise
 
 # Gemini API 키 설정
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -110,17 +129,9 @@ if GOOGLE_API_KEY == 'YOUR_NEW_API_KEY_HERE' or not GOOGLE_API_KEY:
     print("      2. 코드에서: GOOGLE_API_KEY = 'your-api-key'")
     GOOGLE_API_KEY = None
 
-# 데이터베이스 초기화 (메모리 데이터베이스가 아닌 경우에만)
-if DATABASE_URL != ':memory:':
-    try:
-        conn = get_db_connection()
-        init_memory_db(conn)  # 파일 기반 DB에서도 테이블 생성
-        conn.close()
-        print("✅ 데이터베이스 초기화 완료")
-    except Exception as e:
-        print(f"❌ 데이터베이스 초기화 실패: {e}")
-else:
-    print("📊 메모리 데이터베이스 사용 중")
+# Flask 앱 컨텍스트에서 PostgreSQL 데이터베이스 초기화 실행
+with app.app_context():
+    init_postgres_db()
 
 if GOOGLE_API_KEY:
     try:
@@ -171,7 +182,14 @@ def get_available_models():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        print(f"❌ 메인 페이지 렌더링 오류: {e}")
+        import traceback
+        print("상세 에러:")
+        print(traceback.format_exc())
+        return f"서버 오류가 발생했습니다: {str(e)}", 500
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
@@ -203,16 +221,16 @@ def admin():
         admin_data = []
         for row in results:
             admin_data.append({
-                'id': row[0],
-                'student_id': row[1],
-                'name': row[2],
-                'mbti': row[3],
-                'instagram_id': row[4],
-                'gender': row[5],
-                'saju_result': row[6],
-                'ai_analysis': row[7],
-                'is_matched': row[8],
-                'created_at': row[9]
+                'id': row['id'],
+                'student_id': row['student_id'],
+                'name': row['name'],
+                'mbti': row['mbti'],
+                'instagram_id': row['instagram_id'],
+                'gender': row['gender'],
+                'saju_result': row['saju_result'],
+                'ai_analysis': row['ai_analysis'],
+                'is_matched': row['is_matched'],
+                'created_at': row['created_at']
             })
 
         return render_template('admin.html', results=admin_data)
@@ -266,20 +284,20 @@ def get_result_detail(result_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM results WHERE id = ?", (result_id,))
+        cursor.execute("SELECT * FROM results WHERE id = %s", (result_id,))
         result = cursor.fetchone()
         conn.close()
 
         if result:
             return jsonify({
-                'id': result[0],
-                'student_id': result[1],
-                'name': result[2],
-                'mbti': result[3],
-                'instagram_id': result[4],
-                'saju_result': result[5],
-                'ai_analysis': result[6],
-                'created_at': result[7]
+                'id': result['id'],
+                'student_id': result['student_id'],
+                'name': result['name'],
+                'mbti': result['mbti'],
+                'instagram_id': result['instagram_id'],
+                'saju_result': result['saju_result'],
+                'ai_analysis': result['ai_analysis'],
+                'created_at': result['created_at']
             })
         else:
             return jsonify({'error': '결과를 찾을 수 없습니다'}), 404
@@ -294,7 +312,7 @@ def delete_result(result_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM results WHERE id = ?", (result_id,))
+        cursor.execute("DELETE FROM results WHERE id = %s", (result_id,))
         conn.commit()
         deleted = cursor.rowcount
         conn.close()
@@ -808,8 +826,12 @@ def perform_matching():
         # 3. 선정된 매칭 결과들을 데이터베이스에 저장
         for match in unique_matches:
             cursor.execute("""
-                INSERT OR REPLACE INTO matches (user1_id, user2_id, compatibility_score, matching_reason)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO matches (user1_id, user2_id, compatibility_score, matching_reason)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (user1_id, user2_id) DO UPDATE SET
+                compatibility_score = EXCLUDED.compatibility_score,
+                matching_reason = EXCLUDED.matching_reason,
+                created_at = CURRENT_TIMESTAMP
             """, (match['user1_id'], match['user2_id'], match['compatibility_score'], match['matching_reason']))
 
             # 매칭 결과를 응답용으로도 저장
@@ -831,7 +853,7 @@ def perform_matching():
         if new_user_ids:
             # 새로운 사용자들의 is_matched를 TRUE로 업데이트
             cursor.executemany(
-                "UPDATE results SET is_matched = TRUE WHERE id = ?",
+                "UPDATE results SET is_matched = TRUE WHERE id = %s",
                 [(user_id,) for user_id in new_user_ids]
             )
 
@@ -881,19 +903,19 @@ def get_matching_results():
         results = []
         for match in matches:
             results.append({
-                'id': match[0],
-                'compatibility_score': match[1],
-                'matching_reason': match[2],
-                'created_at': match[3],
+                'id': match['id'],
+                'compatibility_score': match['compatibility_score'],
+                'matching_reason': match['matching_reason'],
+                'created_at': match['created_at'],
                 'user1': {
-                    'name': match[4],
-                    'mbti': match[5],
-                    'instagram': match[6]
+                    'name': match['user1_name'],
+                    'mbti': match['user1_mbti'],
+                    'instagram': match['user1_instagram']
                 },
                 'user2': {
-                    'name': match[7],
-                    'mbti': match[8],
-                    'instagram': match[9]
+                    'name': match['user2_name'],
+                    'mbti': match['user2_mbti'],
+                    'instagram': match['user2_instagram']
                 }
             })
 
@@ -987,7 +1009,7 @@ def analyze_saju():
             cursor = conn.cursor()
 
             # 동일한 학번이 이미 존재하는지 확인
-            cursor.execute("SELECT COUNT(*) FROM results WHERE student_id = ?", (student_id,))
+            cursor.execute("SELECT COUNT(*) FROM results WHERE student_id = %s", (student_id,))
             existing_count = cursor.fetchone()[0]
 
             if existing_count > 0:
@@ -996,7 +1018,7 @@ def analyze_saju():
 
             # 중복이 없으면 데이터 저장
             cursor.execute(
-                "INSERT INTO results (student_id, name, mbti, instagram_id, saju_result, ai_analysis, gender) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO results (student_id, name, mbti, instagram_id, saju_result, ai_analysis, gender) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                 (student_id, name, mbti, instagram_id, saju_text, ai_response, gender)
             )
             conn.commit()
@@ -1013,8 +1035,7 @@ def analyze_saju():
         "ai_analysis": ai_response
     })
 
-# Vercel에서 사용할 WSGI 애플리케이션
-app = app
+# Vercel에서 사용할 WSGI 애플리케이션 (파일 끝의 app 객체를 사용)
 
 # 로컬 개발용 코드 (Vercel에서는 실행되지 않음)
 if __name__ == '__main__':
