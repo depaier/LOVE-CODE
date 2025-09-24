@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import google.generativeai as genai
-import psycopg2
-from psycopg2.extras import RealDictCursor
+from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
 
@@ -52,70 +51,53 @@ app = Flask(__name__,
             static_folder='static')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here-change-this-in-production')
 
-# PostgreSQL 데이터베이스 연결 설정
-DATABASE_URL = os.getenv('DATABASE_URL')
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL 환경변수가 설정되지 않았습니다. Vercel Postgres 연결 문자열을 설정해주세요.")
+# Supabase 연결 설정
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY')
 
-def get_db_connection():
-    """PostgreSQL 데이터베이스 연결을 반환"""
-    try:
-        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-    except Exception as e:
-        print(f"❌ 데이터베이스 연결 실패: {e}")
-        raise
+if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+    raise ValueError("SUPABASE_URL과 SUPABASE_ANON_KEY 환경변수가 설정되지 않았습니다.")
 
-def init_postgres_db():
-    """PostgreSQL 데이터베이스 테이블 초기화"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+# Supabase 클라이언트 생성
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-        # results 테이블 생성
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS results (
-                id SERIAL PRIMARY KEY,
-                student_id INTEGER NOT NULL,
-                name TEXT NOT NULL,
-                mbti TEXT NOT NULL,
-                instagram_id TEXT NOT NULL,
-                saju_result TEXT NOT NULL,
-                ai_analysis TEXT NOT NULL,
-                is_matched BOOLEAN DEFAULT FALSE,
-                gender TEXT DEFAULT '',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+def init_supabase_tables():
+    """Supabase 테이블 초기화 (SQL 에디터에서 수동으로 실행)"""
+    print("📝 Supabase SQL 에디터에서 다음 쿼리들을 실행하세요:")
+    print("""
+-- results 테이블 생성
+CREATE TABLE IF NOT EXISTS results (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    mbti TEXT NOT NULL,
+    instagram_id TEXT NOT NULL,
+    saju_result TEXT NOT NULL,
+    ai_analysis TEXT NOT NULL,
+    is_matched BOOLEAN DEFAULT FALSE,
+    gender TEXT DEFAULT '',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
-        # matches 테이블 생성
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS matches (
-                id SERIAL PRIMARY KEY,
-                user1_id INTEGER NOT NULL REFERENCES results(id) ON DELETE CASCADE,
-                user2_id INTEGER NOT NULL REFERENCES results(id) ON DELETE CASCADE,
-                compatibility_score INTEGER NOT NULL,
-                matching_reason TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(user1_id, user2_id)
-            )
-        ''')
+-- matches 테이블 생성
+CREATE TABLE IF NOT EXISTS matches (
+    id SERIAL PRIMARY KEY,
+    user1_id INTEGER NOT NULL REFERENCES results(id) ON DELETE CASCADE,
+    user2_id INTEGER NOT NULL REFERENCES results(id) ON DELETE CASCADE,
+    compatibility_score INTEGER NOT NULL,
+    matching_reason TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user1_id, user2_id)
+);
 
-        # 인덱스 생성
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_results_student_id ON results(student_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_results_is_matched ON results(is_matched)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_matches_user1_id ON matches(user1_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_matches_user2_id ON matches(user2_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_matches_score ON matches(compatibility_score DESC)')
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-
-        print("✅ PostgreSQL 데이터베이스 초기화 완료")
-
-    except Exception as e:
-        print(f"❌ PostgreSQL 데이터베이스 초기화 실패: {e}")
-        raise
+-- 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_results_student_id ON results(student_id);
+CREATE INDEX IF NOT EXISTS idx_results_is_matched ON results(is_matched);
+CREATE INDEX IF NOT EXISTS idx_matches_user1_id ON matches(user1_id);
+CREATE INDEX IF NOT EXISTS idx_matches_user2_id ON matches(user2_id);
+CREATE INDEX IF NOT EXISTS idx_matches_score ON matches(compatibility_score DESC);
+    """)
+    print("✅ Supabase 테이블 생성 쿼리가 출력되었습니다.")
 
 # Gemini API 키 설정
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -129,9 +111,9 @@ if GOOGLE_API_KEY == 'YOUR_NEW_API_KEY_HERE' or not GOOGLE_API_KEY:
     print("      2. 코드에서: GOOGLE_API_KEY = 'your-api-key'")
     GOOGLE_API_KEY = None
 
-# Flask 앱 컨텍스트에서 PostgreSQL 데이터베이스 초기화 실행
-with app.app_context():
-    init_postgres_db()
+# Supabase 테이블 초기화 안내 (실제 초기화는 Supabase 대시보드에서 수동으로 실행)
+print("🚀 Supabase 데이터베이스 설정:")
+init_supabase_tables()
 
 if GOOGLE_API_KEY:
     try:
@@ -211,29 +193,11 @@ def admin():
 
     # 로그인된 상태 - 관리자 페이지 표시
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, student_id, name, mbti, instagram_id, gender, saju_result, ai_analysis, is_matched, created_at FROM results ORDER BY created_at DESC")
-        results = cursor.fetchall()
-        conn.close()
+        # Supabase에서 데이터 조회
+        response = supabase.table('results').select('*').order('created_at', desc=True).execute()
+        results = response.data
 
-        # 결과를 템플릿에 전달할 수 있도록 리스트로 변환
-        admin_data = []
-        for row in results:
-            admin_data.append({
-                'id': row['id'],
-                'student_id': row['student_id'],
-                'name': row['name'],
-                'mbti': row['mbti'],
-                'instagram_id': row['instagram_id'],
-                'gender': row['gender'],
-                'saju_result': row['saju_result'],
-                'ai_analysis': row['ai_analysis'],
-                'is_matched': row['is_matched'],
-                'created_at': row['created_at']
-            })
-
-        return render_template('admin.html', results=admin_data)
+        return render_template('admin.html', results=results)
     except Exception as e:
         return f"관리자 페이지 로딩 중 오류 발생: {e}"
 
@@ -282,23 +246,12 @@ def get_result_detail(result_id):
         return jsonify({'error': '로그인이 필요합니다'}), 401
 
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM results WHERE id = %s", (result_id,))
-        result = cursor.fetchone()
-        conn.close()
+        # Supabase에서 특정 결과 조회
+        response = supabase.table('results').select('*').eq('id', result_id).execute()
+        result = response.data
 
-        if result:
-            return jsonify({
-                'id': result['id'],
-                'student_id': result['student_id'],
-                'name': result['name'],
-                'mbti': result['mbti'],
-                'instagram_id': result['instagram_id'],
-                'saju_result': result['saju_result'],
-                'ai_analysis': result['ai_analysis'],
-                'created_at': result['created_at']
-            })
+        if result and len(result) > 0:
+            return jsonify(result[0])
         else:
             return jsonify({'error': '결과를 찾을 수 없습니다'}), 404
     except Exception as e:
@@ -310,14 +263,11 @@ def delete_result(result_id):
         return jsonify({'error': '로그인이 필요합니다'}), 401
 
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM results WHERE id = %s", (result_id,))
-        conn.commit()
-        deleted = cursor.rowcount
-        conn.close()
+        # Supabase에서 데이터 삭제
+        response = supabase.table('results').delete().eq('id', result_id).execute()
+        deleted_count = len(response.data)
 
-        if deleted > 0:
+        if deleted_count > 0:
             return jsonify({'message': '결과가 성공적으로 삭제되었습니다'})
         else:
             return jsonify({'error': '삭제할 결과를 찾을 수 없습니다'}), 404
@@ -330,17 +280,14 @@ def perform_matching():
         return jsonify({'error': '로그인이 필요합니다'}), 401
 
     try:
-        # 새로운 사용자와 기존 매칭된 사용자 모두 가져오기
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
+        # Supabase에서 데이터 조회
         # 새로운 사용자들 (is_matched = FALSE)
-        cursor.execute("SELECT id, name, mbti, saju_result, ai_analysis, gender FROM results WHERE is_matched = FALSE")
-        new_users = cursor.fetchall()
+        new_users_response = supabase.table('results').select('id, name, mbti, saju_result, ai_analysis, gender').eq('is_matched', False).execute()
+        new_users = new_users_response.data
 
         # 기존 매칭된 사용자들 (is_matched = TRUE)
-        cursor.execute("SELECT id, name, mbti, saju_result, ai_analysis, gender FROM results WHERE is_matched = TRUE")
-        existing_users = cursor.fetchall()
+        existing_users_response = supabase.table('results').select('id, name, mbti, saju_result, ai_analysis, gender').eq('is_matched', True).execute()
+        existing_users = existing_users_response.data
 
         if len(new_users) == 0:
             return jsonify({'error': '매칭할 새로운 사용자가 없습니다'}), 400
@@ -823,16 +770,14 @@ def perform_matching():
                 seen_pairs.add(pair_key)
                 unique_matches.append(match)
 
-        # 3. 선정된 매칭 결과들을 데이터베이스에 저장
+        # 3. 선정된 매칭 결과들을 Supabase에 저장
         for match in unique_matches:
-            cursor.execute("""
-                INSERT INTO matches (user1_id, user2_id, compatibility_score, matching_reason)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (user1_id, user2_id) DO UPDATE SET
-                compatibility_score = EXCLUDED.compatibility_score,
-                matching_reason = EXCLUDED.matching_reason,
-                created_at = CURRENT_TIMESTAMP
-            """, (match['user1_id'], match['user2_id'], match['compatibility_score'], match['matching_reason']))
+            supabase.table('matches').upsert({
+                'user1_id': match['user1_id'],
+                'user2_id': match['user2_id'],
+                'compatibility_score': match['compatibility_score'],
+                'matching_reason': match['matching_reason']
+            }).execute()
 
             # 매칭 결과를 응답용으로도 저장
             # 모든 사용자들에서 이름 찾기
@@ -852,13 +797,8 @@ def perform_matching():
 
         if new_user_ids:
             # 새로운 사용자들의 is_matched를 TRUE로 업데이트
-            cursor.executemany(
-                "UPDATE results SET is_matched = TRUE WHERE id = %s",
-                [(user_id,) for user_id in new_user_ids]
-            )
-
-        conn.commit()
-        conn.close()
+            for user_id in new_user_ids:
+                supabase.table('results').update({'is_matched': True}).eq('id', user_id).execute()
 
         return jsonify({
             'message': f'매칭이 완료되었습니다. 70점 이상인 매칭 결과만 선정하여 총 {len(matches)}개의 매칭 결과를 생성했습니다.',
@@ -875,47 +815,33 @@ def get_matching_results():
         return jsonify({'error': '로그인이 필요합니다'}), 401
 
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # 매칭 결과 조회 (사용자 정보와 함께)
-        cursor.execute("""
-            SELECT
-                m.id,
-                m.compatibility_score,
-                m.matching_reason,
-                m.created_at,
-                u1.name as user1_name,
-                u1.mbti as user1_mbti,
-                u1.instagram_id as user1_instagram,
-                u2.name as user2_name,
-                u2.mbti as user2_mbti,
-                u2.instagram_id as user2_instagram
-            FROM matches m
-            JOIN results u1 ON m.user1_id = u1.id
-            JOIN results u2 ON m.user2_id = u2.id
-            ORDER BY m.compatibility_score DESC, m.created_at DESC
-        """)
-
-        matches = cursor.fetchall()
-        conn.close()
+        # Supabase에서 매칭 결과 조회
+        matches_response = supabase.table('matches').select('*').order('compatibility_score', desc=True).order('created_at', desc=True).execute()
+        matches_data = matches_response.data
 
         results = []
-        for match in matches:
+        for match in matches_data:
+            # 각 사용자 정보 별도 조회
+            user1_response = supabase.table('results').select('name, mbti, instagram_id').eq('id', match['user1_id']).execute()
+            user2_response = supabase.table('results').select('name, mbti, instagram_id').eq('id', match['user2_id']).execute()
+
+            user1_data = user1_response.data[0] if user1_response.data else {'name': 'Unknown', 'mbti': '', 'instagram_id': ''}
+            user2_data = user2_response.data[0] if user2_response.data else {'name': 'Unknown', 'mbti': '', 'instagram_id': ''}
+
             results.append({
                 'id': match['id'],
                 'compatibility_score': match['compatibility_score'],
                 'matching_reason': match['matching_reason'],
                 'created_at': match['created_at'],
                 'user1': {
-                    'name': match['user1_name'],
-                    'mbti': match['user1_mbti'],
-                    'instagram': match['user1_instagram']
+                    'name': user1_data['name'],
+                    'mbti': user1_data['mbti'],
+                    'instagram': user1_data['instagram_id']
                 },
                 'user2': {
-                    'name': match['user2_name'],
-                    'mbti': match['user2_mbti'],
-                    'instagram': match['user2_instagram']
+                    'name': user2_data['name'],
+                    'mbti': user2_data['mbti'],
+                    'instagram': user2_data['instagram_id']
                 }
             })
 
@@ -1003,29 +929,28 @@ def analyze_saju():
         if ai_response.startswith('<!DOCTYPE') or '<html' in ai_response.lower():
             raise Exception(f"HTML 에러 페이지가 반환되었습니다. API 키나 모델 설정을 확인해주세요. 응답 내용: {ai_response[:200]}...")
 
-        # 학번 중복 체크
+        # 학번 중복 체크 및 데이터 저장
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-
-            # 동일한 학번이 이미 존재하는지 확인
-            cursor.execute("SELECT COUNT(*) FROM results WHERE student_id = %s", (student_id,))
-            existing_count = cursor.fetchone()[0]
-
-            if existing_count > 0:
-                conn.close()
+            # Supabase에서 학번 중복 체크
+            existing_response = supabase.table('results').select('id').eq('student_id', student_id).execute()
+            if existing_response.data and len(existing_response.data) > 0:
                 return jsonify({"error": "이미 등록된 학번입니다. 동일한 학번으로 중복 등록할 수 없습니다."}), 400
 
-            # 중복이 없으면 데이터 저장
-            cursor.execute(
-                "INSERT INTO results (student_id, name, mbti, instagram_id, saju_result, ai_analysis, gender) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (student_id, name, mbti, instagram_id, saju_text, ai_response, gender)
-            )
-            conn.commit()
-            conn.close()
-            print("분석 결과가 데이터베이스에 성공적으로 저장되었습니다.")
+            # 중복이 없으면 Supabase에 데이터 저장
+            insert_response = supabase.table('results').insert({
+                'student_id': student_id,
+                'name': name,
+                'mbti': mbti,
+                'instagram_id': instagram_id,
+                'saju_result': saju_text,
+                'ai_analysis': ai_response,
+                'gender': gender
+            }).execute()
+
+            print("분석 결과가 Supabase에 성공적으로 저장되었습니다.")
         except Exception as e:
-            print(f"데이터베이스 저장 중 오류 발생: {e}")
+            print(f"Supabase 저장 중 오류 발생: {e}")
+            return jsonify({"error": f"데이터 저장 중 오류가 발생했습니다: {e}"}), 500
             # DB 저장 끝 
     except Exception as e:
         return jsonify({"error": f"Gemini API 처리 중 오류 발생: {e}"}), 500
