@@ -106,8 +106,12 @@ CREATE INDEX IF NOT EXISTS idx_results_is_matched ON results(is_matched);
 CREATE INDEX IF NOT EXISTS idx_matches_user1_id ON matches(user1_id);
 CREATE INDEX IF NOT EXISTS idx_matches_user2_id ON matches(user2_id);
 CREATE INDEX IF NOT EXISTS idx_matches_score ON matches(compatibility_score DESC);
+
+-- 시퀀스 재설정 (중복 ID 문제 해결)
+SELECT setval('results_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM results), false);
+SELECT setval('matches_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM matches), false);
     """)
-    print("✅ Supabase 테이블 생성 쿼리가 출력되었습니다.")
+    print("✅ Supabase 테이블 생성 및 시퀀스 재설정 쿼리가 출력되었습니다.")
 
 # Gemini API 키 설정
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -1033,13 +1037,16 @@ def analyze_saju():
 
         # 학번 중복 체크 및 데이터 저장
         try:
-            # Supabase에서 학번 중복 체크
-            existing_response = supabase.table('results').select('id').eq('student_id', student_id).execute()
-            if existing_response.data and len(existing_response.data) > 0:
-                return jsonify({"error": "이미 등록된 학번입니다. 동일한 학번으로 중복 등록할 수 없습니다."}), 400
+            print(f"📝 데이터 저장 시도: 학번 {student_id}, 이름 {name}")
 
-            # 중복이 없으면 Supabase에 데이터 저장
-            insert_response = supabase.table('results').insert({
+            # Supabase에서 학번 중복 체크 (더 강력하게)
+            existing_response = supabase.table('results').select('id, student_id, name').eq('student_id', student_id).execute()
+            if existing_response.data and len(existing_response.data) > 0:
+                existing_user = existing_response.data[0]
+                return jsonify({"error": f"이미 등록된 학번입니다. ({existing_user['name']}님이 등록하셨습니다)"}), 400
+
+            # 중복이 없으면 Supabase에 데이터 저장 (id 필드 명시적 제외)
+            data_to_insert = {
                 'student_id': student_id,
                 'name': name,
                 'mbti': mbti,
@@ -1047,9 +1054,34 @@ def analyze_saju():
                 'saju_result': saju_text,
                 'ai_analysis': ai_response,
                 'gender': gender
-            }).execute()
+            }
 
-            print("분석 결과가 Supabase에 성공적으로 저장되었습니다.")
+            print(f"💾 저장할 데이터: {data_to_insert}")
+
+            # 일반 insert 사용 (Supabase auto-increment가 작동해야 함)
+            try:
+                insert_response = supabase.table('results').insert(data_to_insert).execute()
+            except Exception as insert_error:
+                # 시퀀스 문제일 수 있으므로 재시도
+                print(f"❌ 일반 insert 실패, 시퀀스 문제일 수 있음: {insert_error}")
+
+                # 최대 ID 조회 후 다음 ID로 명시적 지정
+                try:
+                    max_id_response = supabase.table('results').select('id').order('id', desc=True).limit(1).execute()
+                    next_id = (max_id_response.data[0]['id'] + 1) if max_id_response.data else 1
+
+                    data_with_id = data_to_insert.copy()
+                    data_with_id['id'] = next_id
+
+                    print(f"🔄 ID 명시적 지정 후 재시도: ID = {next_id}")
+                    insert_response = supabase.table('results').insert(data_with_id).execute()
+
+                except Exception as retry_error:
+                    print(f"❌ ID 명시적 지정 재시도 실패: {retry_error}")
+                    raise insert_error  # 원래 오류 다시 발생
+
+            print("✅ 분석 결과가 Supabase에 성공적으로 저장되었습니다.")
+            print(f"   저장된 데이터 ID: {insert_response.data[0]['id'] if insert_response.data else '알 수 없음'}")
         except Exception as e:
             print(f"Supabase 저장 중 오류 발생: {e}")
             return jsonify({"error": f"데이터 저장 중 오류가 발생했습니다: {e}"}), 500
