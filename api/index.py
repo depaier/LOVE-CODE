@@ -290,7 +290,11 @@ def delete_result(result_id):
 
 @app.route('/admin/matching', methods=['POST'])
 def perform_matching():
-    if not session.get('logged_in'):
+    # 로컬 개발 환경에서 세션 체크 우회 (디버깅용)
+    import os
+    if os.getenv('FLASK_ENV') == 'development':
+        print("🔧 개발 환경에서 세션 체크 우회")
+    elif not session.get('logged_in'):
         return jsonify({'error': '로그인이 필요합니다'}), 401
 
     try:
@@ -334,16 +338,24 @@ def perform_matching():
             males = []
             females = []
             for i, user in enumerate(users):
-                if len(user) < 6:
-                    print(f"⚠️ 사용자 {i}번 데이터가 불완전합니다. 길이: {len(user)}, 데이터: {user}")
+                # Supabase에서 반환되는 데이터는 딕셔너리 형태
+                if not isinstance(user, dict):
+                    print(f"⚠️ 사용자 {i}번 데이터가 딕셔너리가 아닙니다. 타입: {type(user)}, 데이터: {user}")
                     continue
-                gender = user[5] if len(user) > 5 else ''  # gender는 6번째 필드
+
+                # 필수 필드 확인
+                if 'gender' not in user:
+                    print(f"⚠️ 사용자 {i}번 데이터에 gender 필드가 없습니다. 데이터: {user}")
+                    continue
+
+                gender = user.get('gender', '').strip()
                 if gender == 'MALE':
                     males.append(user)
                 elif gender == 'FEMALE':
                     females.append(user)
                 else:
-                    # 성별이 지정되지 않은 경우 기본적으로 남자로 취급 (필요시 수정)
+                    # 성별이 지정되지 않은 경우 기본적으로 남자로 취급
+                    print(f"ℹ️ 사용자 {i}번 성별 미지정 (기본: 남자), 데이터: {user}")
                     males.append(user)
             return males, females
 
@@ -402,23 +414,23 @@ def perform_matching():
                     두 사람의 사주와 MBTI 정보를 바탕으로 연애/커플 매칭 호환성을 분석해주세요.
 
                     [사용자 1]
-                    이름: {user1[1]}
-                    MBTI: {user1[2]}
-                    사주: {user1[3]}
-                    AI 분석: {user1[4]}
+                    이름: {user1['name']}
+                    MBTI: {user1['mbti']}
+                    사주: {user1['saju_result']}
+                    AI 분석: {user1['ai_analysis']}
 
                     [사용자 2]
-                    이름: {user2[1]}
-                    MBTI: {user2[2]}
-                    사주: {user2[3]}
-                    AI 분석: {user2[4]}
+                    이름: {user2['name']}
+                    MBTI: {user2['mbti']}
+                    사주: {user2['saju_result']}
+                    AI 분석: {user2['ai_analysis']}
 
                     다음 형식으로만 응답해주세요:
                     호환성 점수: [1-100 사이의 숫자]
                     매칭 이유: [호환성 분석 및 이유 설명]
                     """
 
-                    print(f"🤖 AI 호출 시도: {user1[1]} ↔ {user2[1]}")
+                    print(f"🤖 AI 호출 시도: {user1['name']} ↔ {user2['name']}")
                     print(f"📝 Prompt 길이: {len(prompt)} 문자")
 
                     # Vercel 환경용 타임아웃 설정 및 재시도 로직
@@ -486,7 +498,7 @@ def perform_matching():
                                 else:
                                     print(f"⚠️ 점수 추출 실패: '{score_text}'")
                             except Exception as parse_error:
-                                print(f"❌ 점수 파싱 오류 ({user1[1]} ↔ {user2[1]}): {parse_error}")
+                                print(f"❌ 점수 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
                         elif '매칭 이유:' in line and not reason_found:
                             try:
                                 reason_text = line.split('매칭 이유:', 1)[1].strip()
@@ -497,7 +509,7 @@ def perform_matching():
                                 else:
                                     print(f"⚠️ 매칭 이유가 빈 문자열임")
                             except Exception as parse_error:
-                                print(f"❌ 매칭 이유 파싱 오류 ({user1[1]} ↔ {user2[1]}): {parse_error}")
+                                print(f"❌ 매칭 이유 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
 
                     # 매칭 이유를 찾지 못한 경우 전체 응답에서 추출 시도
                     if not reason_found and len(ai_result) > 100:
@@ -529,18 +541,18 @@ def perform_matching():
 
                     # 모든 매칭 분석 결과를 저장 (중복 포함)
                     all_pair_scores.append({
-                        'user1_id': user1[0],
-                        'user2_id': user2[0],
-                        'user1_name': user1[1],
-                        'user2_name': user2[1],
+                        'user1_id': user1['id'],
+                        'user2_id': user2['id'],
+                        'user1_name': user1['name'],
+                        'user2_name': user2['name'],
                         'compatibility_score': compatibility_score,
                         'matching_reason': matching_reason
                     })
 
-                    print(f"✅ 매칭 분석 완료: {user1[1]} ↔ {user2[1]} (점수: {compatibility_score})")
+                    print(f"✅ 매칭 분석 완료: {user1['name']} ↔ {user2['name']} (점수: {compatibility_score})")
 
                 except Exception as e:
-                    error_msg = f"매칭 분석 중 오류 발생 ({user1[1]} ↔ {user2[1]}): {str(e)}"
+                    error_msg = f"매칭 분석 중 오류 발생 ({user1['name']} ↔ {user2['name']}): {str(e)}"
                     print(f"❌ {error_msg}")
                     print(f"❌ 오류 타입: {type(e).__name__}")
                     import traceback
@@ -562,16 +574,16 @@ def perform_matching():
                     두 사람의 사주와 MBTI 정보를 바탕으로 연애/커플 매칭 호환성을 분석해주세요.
 
                     [사용자 1]
-                    이름: {user1[1]}
-                    MBTI: {user1[2]}
-                    사주: {user1[3]}
-                    AI 분석: {user1[4]}
+                    이름: {user1['name']}
+                    MBTI: {user1['mbti']}
+                    사주: {user1['saju_result']}
+                    AI 분석: {user1['ai_analysis']}
 
                     [사용자 2]
-                    이름: {user2[1]}
-                    MBTI: {user2[2]}
-                    사주: {user2[3]}
-                    AI 분석: {user2[4]}
+                    이름: {user2['name']}
+                    MBTI: {user2['mbti']}
+                    사주: {user2['saju_result']}
+                    AI 분석: {user2['ai_analysis']}
 
                     다음 형식으로만 응답해주세요:
                     호환성 점수: [1-100 사이의 숫자]
@@ -624,7 +636,7 @@ def perform_matching():
                                     else:
                                         print(f"⚠️ 호환성 점수를 찾을 수 없음: {line}")
                                 except Exception as parse_error:
-                                    print(f"❌ 호환성 점수 파싱 오류 ({user1[1]} ↔ {user2[1]}): {parse_error}")
+                                    print(f"❌ 호환성 점수 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
 
                         # 매칭 이유 찾기
                         elif '매칭 이유:' in line and not reason_found:
@@ -637,7 +649,7 @@ def perform_matching():
                                 else:
                                     print(f"⚠️ 매칭 이유가 빈 문자열임")
                             except Exception as parse_error:
-                                print(f"❌ 매칭 이유 파싱 오류 ({user1[1]} ↔ {user2[1]}): {parse_error}")
+                                print(f"❌ 매칭 이유 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
 
                     # 매칭 이유를 찾지 못한 경우 전체 응답에서 추출 시도
                     if not reason_found and len(ai_result) > 100:
@@ -669,18 +681,18 @@ def perform_matching():
 
                     # 모든 매칭 분석 결과를 저장 (중복 포함)
                     all_pair_scores.append({
-                        'user1_id': user1[0],
-                        'user2_id': user2[0],
-                        'user1_name': user1[1],
-                        'user2_name': user2[1],
+                        'user1_id': user1['id'],
+                        'user2_id': user2['id'],
+                        'user1_name': user1['name'],
+                        'user2_name': user2['name'],
                         'compatibility_score': compatibility_score,
                         'matching_reason': matching_reason
                     })
 
-                    print(f"✅ 매칭 분석 완료: {user1[1]} ↔ {user2[1]} (점수: {compatibility_score})")
+                    print(f"✅ 매칭 분석 완료: {user1['name']} ↔ {user2['name']} (점수: {compatibility_score})")
 
                 except Exception as e:
-                    error_msg = f"매칭 분석 중 오류 발생 ({user1[1]} ↔ {user2[1]}): {str(e)}"
+                    error_msg = f"매칭 분석 중 오류 발생 ({user1['name']} ↔ {user2['name']}): {str(e)}"
                     print(f"❌ {error_msg}")
 
                     # 치명적인 오류인 경우 전체 매칭을 중단
@@ -699,16 +711,16 @@ def perform_matching():
                     두 사람의 사주와 MBTI 정보를 바탕으로 연애/커플 매칭 호환성을 분석해주세요.
 
                     [사용자 1]
-                    이름: {user1[1]}
-                    MBTI: {user1[2]}
-                    사주: {user1[3]}
-                    AI 분석: {user1[4]}
+                    이름: {user1['name']}
+                    MBTI: {user1['mbti']}
+                    사주: {user1['saju_result']}
+                    AI 분석: {user1['ai_analysis']}
 
                     [사용자 2]
-                    이름: {user2[1]}
-                    MBTI: {user2[2]}
-                    사주: {user2[3]}
-                    AI 분석: {user2[4]}
+                    이름: {user2['name']}
+                    MBTI: {user2['mbti']}
+                    사주: {user2['saju_result']}
+                    AI 분석: {user2['ai_analysis']}
 
                     다음 형식으로만 응답해주세요:
                     호환성 점수: [1-100 사이의 숫자]
@@ -761,7 +773,7 @@ def perform_matching():
                                     else:
                                         print(f"⚠️ 호환성 점수를 찾을 수 없음: {line}")
                                 except Exception as parse_error:
-                                    print(f"❌ 호환성 점수 파싱 오류 ({user1[1]} ↔ {user2[1]}): {parse_error}")
+                                    print(f"❌ 호환성 점수 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
 
                         # 매칭 이유 찾기
                         elif '매칭 이유:' in line and not reason_found:
@@ -774,7 +786,7 @@ def perform_matching():
                                 else:
                                     print(f"⚠️ 매칭 이유가 빈 문자열임")
                             except Exception as parse_error:
-                                print(f"❌ 매칭 이유 파싱 오류 ({user1[1]} ↔ {user2[1]}): {parse_error}")
+                                print(f"❌ 매칭 이유 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
 
                     # 매칭 이유를 찾지 못한 경우 전체 응답에서 추출 시도
                     if not reason_found and len(ai_result) > 100:
@@ -806,18 +818,18 @@ def perform_matching():
 
                     # 모든 매칭 분석 결과를 저장 (중복 포함)
                     all_pair_scores.append({
-                        'user1_id': user1[0],
-                        'user2_id': user2[0],
-                        'user1_name': user1[1],
-                        'user2_name': user2[1],
+                        'user1_id': user1['id'],
+                        'user2_id': user2['id'],
+                        'user1_name': user1['name'],
+                        'user2_name': user2['name'],
                         'compatibility_score': compatibility_score,
                         'matching_reason': matching_reason
                     })
 
-                    print(f"✅ 매칭 분석 완료: {user1[1]} ↔ {user2[1]} (점수: {compatibility_score})")
+                    print(f"✅ 매칭 분석 완료: {user1['name']} ↔ {user2['name']} (점수: {compatibility_score})")
 
                 except Exception as e:
-                    error_msg = f"매칭 분석 중 오류 발생 ({user1[1]} ↔ {user2[1]}): {str(e)}"
+                    error_msg = f"매칭 분석 중 오류 발생 ({user1['name']} ↔ {user2['name']}): {str(e)}"
                     print(f"❌ {error_msg}")
 
                     # 치명적인 오류인 경우 전체 매칭을 중단
@@ -1098,6 +1110,10 @@ def analyze_saju():
 
 # 로컬 개발용 코드 (Vercel에서는 실행되지 않음)
 if __name__ == '__main__':
+    print("🚀 로컬 개발 서버 시작...")
+    print(f"📍 FLASK_ENV: {os.getenv('FLASK_ENV', 'production')}")
+    print(f"🔗 서버 주소: http://localhost:5000")
+
     # 시작 시 API 키 상태 확인
     if GOOGLE_API_KEY:
         print("\n🔧 API 키 상태 확인 중...")
@@ -1121,8 +1137,15 @@ if __name__ == '__main__':
         print("\n⚠️  GOOGLE_API_KEY가 설정되지 않았습니다.")
         print("   🔑 Google AI Studio에서 새 API 키를 발급받으세요:")
         print("      https://makersuite.google.com/app/apikey")
-        print("   📝 발급받은 키를 코드에서 GOOGLE_API_KEY 변수에 입력하세요.")
+        print("   📝 .env 파일에 GOOGLE_API_KEY를 설정하세요.")
 
-    app.run(debug=True)
+    # Supabase 연결 상태 확인
+    try:
+        test_response = supabase.table('results').select('count').limit(1).execute()
+        print("✅ Supabase 연결 성공")
+    except Exception as e:
+        print(f"❌ Supabase 연결 실패: {e}")
+
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
 
