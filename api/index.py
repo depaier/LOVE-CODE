@@ -370,11 +370,22 @@ def perform_matching():
 
         # 데이터 구조 검증
         print("🔍 데이터 구조 검증 중...")
+        required_keys = ['id', 'name', 'mbti', 'saju_result', 'ai_analysis', 'gender']
         for i, user in enumerate(new_users + existing_users):
-            print(f"사용자 {i} 데이터: 타입={type(user)}, 길이={len(user) if hasattr(user, '__len__') else 'N/A'}, 내용={user}")
-            if not isinstance(user, (list, tuple)) or len(user) < 6:
-                print(f"⚠️ 사용자 {i} 데이터 구조 이상: {user}")
-                return jsonify({'error': f'사용자 데이터 구조가 올바르지 않습니다. 사용자 {i}: {user}'}), 500
+            print(f"사용자 {i} 데이터: 타입={type(user)}, 키={list(user.keys()) if isinstance(user, dict) else 'N/A'}")
+
+            # 딕셔너리 타입 확인
+            if not isinstance(user, dict):
+                print(f"⚠️ 사용자 {i} 데이터가 딕셔너리가 아닙니다: 타입={type(user)}")
+                continue
+
+            # 필수 키 존재 확인
+            missing_keys = [key for key in required_keys if key not in user]
+            if missing_keys:
+                print(f"⚠️ 사용자 {i} 데이터에 필수 키가 없습니다. 누락된 키: {missing_keys}")
+                continue
+
+            print(f"✅ 사용자 {i} 데이터 구조 정상: {user['name']} ({user['id']})")
 
         matches = []
         all_pair_scores = []  # 모든 쌍의 호환성 점수를 저장
