@@ -889,8 +889,8 @@ def perform_matching():
             # 모든 사용자들에서 이름 찾기
             all_users_for_lookup = new_users + existing_users
             matches.append({
-                'user1': {'id': match['user1_id'], 'name': next(u[1] for u in all_users_for_lookup if u[0] == match['user1_id'])},
-                'user2': {'id': match['user2_id'], 'name': next(u[1] for u in all_users_for_lookup if u[0] == match['user2_id'])},
+                'user1': {'id': match['user1_id'], 'name': next(u['name'] for u in all_users_for_lookup if u['id'] == match['user1_id'])},
+                'user2': {'id': match['user2_id'], 'name': next(u['name'] for u in all_users_for_lookup if u['id'] == match['user2_id'])},
                 'compatibility_score': match['compatibility_score'],
                 'reason': match['matching_reason']
             })
@@ -899,7 +899,7 @@ def perform_matching():
         # (새로운 사용자만 매칭 분석에 참여했으므로 새로운 사용자들의 상태만 변경)
         new_user_ids = set()
         for user in new_users:  # 새로운 사용자들
-            new_user_ids.add(user[0])
+            new_user_ids.add(user['id'])
 
         if new_user_ids:
             # 새로운 사용자들의 is_matched를 TRUE로 업데이트
