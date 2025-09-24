@@ -49,6 +49,55 @@ def calculate_saju_pillars(year, month, day, hour):
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here-change-this-in-production')
 
+# 데이터베이스 경로 설정 (Vercel에서는 메모리 사용)
+DATABASE_URL = os.getenv('DATABASE_URL', 'saju_results.db')
+if os.getenv('VERCEL_ENV'):  # Vercel 환경에서는 메모리 데이터베이스 사용
+    DATABASE_URL = ':memory:'
+
+def get_db_connection():
+    """데이터베이스 연결을 반환하고 필요한 경우 테이블 생성"""
+    conn = sqlite3.connect(DATABASE_URL)
+    if DATABASE_URL == ':memory:':
+        # 메모리 데이터베이스의 경우 테이블 생성
+        init_memory_db(conn)
+    return conn
+
+def init_memory_db(conn):
+    """메모리 데이터베이스용 테이블 초기화"""
+    cursor = conn.cursor()
+
+    # results 테이블 생성
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            mbti TEXT,
+            instagram_id TEXT,
+            saju_result TEXT,
+            ai_analysis TEXT,
+            gender TEXT,
+            is_matched BOOLEAN DEFAULT FALSE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # matches 테이블 생성
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS matches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user1_id INTEGER NOT NULL,
+            user2_id INTEGER NOT NULL,
+            compatibility_score INTEGER NOT NULL,
+            matching_reason TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user1_id) REFERENCES results (id),
+            FOREIGN KEY (user2_id) REFERENCES results (id)
+        )
+    ''')
+
+    conn.commit()
+
 # Gemini API 키 설정
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
@@ -60,6 +109,18 @@ if GOOGLE_API_KEY == 'YOUR_NEW_API_KEY_HERE' or not GOOGLE_API_KEY:
     print("      1. 환경변수: export GOOGLE_API_KEY='your-api-key'")
     print("      2. 코드에서: GOOGLE_API_KEY = 'your-api-key'")
     GOOGLE_API_KEY = None
+
+# 데이터베이스 초기화 (메모리 데이터베이스가 아닌 경우에만)
+if DATABASE_URL != ':memory:':
+    try:
+        conn = get_db_connection()
+        init_memory_db(conn)  # 파일 기반 DB에서도 테이블 생성
+        conn.close()
+        print("✅ 데이터베이스 초기화 완료")
+    except Exception as e:
+        print(f"❌ 데이터베이스 초기화 실패: {e}")
+else:
+    print("📊 메모리 데이터베이스 사용 중")
 
 if GOOGLE_API_KEY:
     try:
@@ -132,7 +193,7 @@ def admin():
 
     # 로그인된 상태 - 관리자 페이지 표시
     try:
-        conn = sqlite3.connect('saju_results.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT id, student_id, name, mbti, instagram_id, gender, saju_result, ai_analysis, is_matched, created_at FROM results ORDER BY created_at DESC")
         results = cursor.fetchall()
@@ -203,7 +264,7 @@ def get_result_detail(result_id):
         return jsonify({'error': '로그인이 필요합니다'}), 401
 
     try:
-        conn = sqlite3.connect('saju_results.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM results WHERE id = ?", (result_id,))
         result = cursor.fetchone()
@@ -231,7 +292,7 @@ def delete_result(result_id):
         return jsonify({'error': '로그인이 필요합니다'}), 401
 
     try:
-        conn = sqlite3.connect('saju_results.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM results WHERE id = ?", (result_id,))
         conn.commit()
@@ -252,7 +313,7 @@ def perform_matching():
 
     try:
         # 새로운 사용자와 기존 매칭된 사용자 모두 가져오기
-        conn = sqlite3.connect('saju_results.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         # 새로운 사용자들 (is_matched = FALSE)
@@ -792,7 +853,7 @@ def get_matching_results():
         return jsonify({'error': '로그인이 필요합니다'}), 401
 
     try:
-        conn = sqlite3.connect('saju_results.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
 
         # 매칭 결과 조회 (사용자 정보와 함께)
@@ -922,7 +983,7 @@ def analyze_saju():
 
         # 학번 중복 체크
         try:
-            conn = sqlite3.connect('saju_results.db')
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             # 동일한 학번이 이미 존재하는지 확인
@@ -953,6 +1014,7 @@ def analyze_saju():
     })
 
 # Vercel에서 사용할 WSGI 애플리케이션
+app = app
 
 # 로컬 개발용 코드 (Vercel에서는 실행되지 않음)
 if __name__ == '__main__':
