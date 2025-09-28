@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>푸시 알림 설정 | 사주 매칭 서비스</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=BM+Hanna+Pro&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        font-family: "BM Hanna Pro", cursive;
+      }
+
+      .card {
+        border: none;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.95);
+      }
+
+      .notification-toggle {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+      }
+
+      .notification-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.4s;
+        border-radius: 34px;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+
+      input:checked + .slider {
+        background-color: #2196f3;
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(26px);
+      }
+
+      .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+
+      .status-enabled {
+        background-color: #28a745;
+      }
+
+      .status-disabled {
+        background-color: #dc3545;
+      }
+
+      .status-unknown {
+        background-color: #ffc107;
+      }
+
+      .settings-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .btn-request {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        border: none;
+        border-radius: 10px;
+        padding: 12px 30px;
+        color: white;
+        font-weight: bold;
+        transition: transform 0.2s ease;
+      }
+
+      .btn-request:hover {
+        transform: translateY(-2px);
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container py-5">
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="card p-4">
+            <div class="text-center mb-4">
+              <i class="fas fa-bell fa-3x text-primary mb-3"></i>
+              <h2>푸시 알림 설정</h2>
+              <p class="text-muted">매칭 알림을 받아보세요</p>
+            </div>
+
+            <!-- 브라우저 알림 권한 상태 -->
+            <div class="settings-section">
+              <h4 class="mb-3">
+                <i class="fas fa-globe me-2"></i>
+                브라우저 알림 권한
+              </h4>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <span
+                    id="permission-status"
+                    class="status-indicator status-unknown"
+                  ></span>
+                  <span id="permission-text">권한 상태 확인 중...</span>
+                </div>
+                <button id="request-permission" class="btn btn-request d-none">
+                  <i class="fas fa-bell me-2"></i>
+                  권한 요청하기
+                </button>
+              </div>
+            </div>
+
+            <!-- 푸시 알림 구독 상태 -->
+            <div class="settings-section">
+              <h4 class="mb-3">
+                <i class="fas fa-toggle-on me-2"></i>
+                푸시 알림 구독
+              </h4>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <span
+                    id="subscription-status"
+                    class="status-indicator status-unknown"
+                  ></span>
+                  <span id="subscription-text">구독 상태 확인 중...</span>
+                </div>
+                <label class="notification-toggle">
+                  <input type="checkbox" id="notification-toggle" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 디바이스 연결 상태 -->
+            <div class="settings-section">
+              <h4 class="mb-3">
+                <i class="fas fa-mobile-alt me-2"></i>
+                디바이스 연결
+              </h4>
+              <div class="d-flex align-items-center justify-content-between">
+                <div>
+                  <span
+                    id="device-status"
+                    class="status-indicator status-unknown"
+                  ></span>
+                  <span id="device-text">연결 상태 확인 중...</span>
+                </div>
+                <small class="text-muted" id="device-token"></small>
+              </div>
+            </div>
+
+            <!-- 알림 테스트 -->
+            <div class="settings-section">
+              <h4 class="mb-3">
+                <i class="fas fa-flask me-2"></i>
+                알림 테스트
+              </h4>
+              <p class="text-muted small mb-3">
+                설정이 제대로 작동하는지 확인해보세요
+              </p>
+              <button id="test-notification" class="btn btn-outline-primary">
+                <i class="fas fa-paper-plane me-2"></i>
+                테스트 알림 보내기
+              </button>
+            </div>
+
+            <!-- 도움말 -->
+            <div class="alert alert-info">
+              <h5><i class="fas fa-question-circle me-2"></i>도움말</h5>
+              <ul class="mb-0 small">
+                <li>
+                  브라우저 알림 권한을 허용해야 푸시 알림을 받을 수 있습니다
+                </li>
+                <li>매칭이 완료되면 자동으로 알림이 전송됩니다</li>
+                <li>알림을 클릭하면 매칭 결과 페이지로 이동합니다</li>
+                <li>
+                  <strong>iOS Safari:</strong> iOS 16.4 이상에서 지원되며,
+                  Safari 설정 > 개인정보 보호 및 보안 > 알림에서 권한을
+                  허용해주세요
+                </li>
+                <li>
+                  설정은 브라우저별로 관리되며, 다른 기기에서는 다시 설정해야
+                  합니다
+                </li>
+                <li>
+                  <strong>팁:</strong> 푸시 알림은 앱이 백그라운드에 있을 때도
+                  작동합니다
+                </li>
+              </ul>
+            </div>
+
+            <div class="text-center mt-4">
+              <a href="/" class="btn btn-outline-primary me-2">
+                <i class="fas fa-home me-2"></i>
+                홈으로
+              </a>
+              <button id="refresh-status" class="btn btn-outline-secondary">
+                <i class="fas fa-sync me-2"></i>
+                상태 새로고침
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- 푸시 알림 관리 스크립트 -->
+    <script>
+      class PushNotificationManager {
+        constructor() {
+          this.deviceToken = null;
+          this.registration = null;
+          this.vapidPublicKey = null;
+          this.init();
+        }
+
+        async init() {
+          // Service Worker 등록
+          if ("serviceWorker" in navigator) {
+            try {
+              this.registration = await navigator.serviceWorker.register(
+                "/static/js/sw.js"
+              );
+              console.log("Service Worker 등록 성공");
+            } catch (error) {
+              console.error("Service Worker 등록 실패:", error);
+            }
+          }
+
+          // VAPID 퍼블릭 키 가져오기
+          await this.loadVapidPublicKey();
+
+          // 디바이스 토큰 생성/가져오기
+          await this.initializeDeviceToken();
+
+          // 상태 업데이트
+          this.updateStatus();
+
+          // 이벤트 리스너 설정
+          this.setupEventListeners();
+        }
+
+        async loadVapidPublicKey() {
+          try {
+            const response = await fetch("/api/push/vapid-public-key");
+            const data = await response.json();
+            this.vapidPublicKey = data.publicKey;
+          } catch (error) {
+            console.error("VAPID 키 로드 실패:", error);
+          }
+        }
+
+        async initializeDeviceToken() {
+          try {
+            const response = await fetch("/api/user/device-token", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            });
+            const data = await response.json();
+            this.deviceToken = data.device_token;
+            document.getElementById("device-token").textContent =
+              this.deviceToken.substring(0, 8) + "...";
+          } catch (error) {
+            console.error("디바이스 토큰 생성 실패:", error);
+          }
+        }
+
+        async updateStatus() {
+          // 브라우저 권한 상태 확인
+          this.updatePermissionStatus();
+
+          // 푸시 구독 상태 확인
+          await this.updateSubscriptionStatus();
+
+          // 디바이스 연결 상태 확인
+          this.updateDeviceStatus();
+        }
+
+        updatePermissionStatus() {
+          const permission = Notification.permission;
+          const statusEl = document.getElementById("permission-status");
+          const textEl = document.getElementById("permission-text");
+          const requestBtn = document.getElementById("request-permission");
+
+          statusEl.className = "status-indicator";
+
+          switch (permission) {
+            case "granted":
+              statusEl.classList.add("status-enabled");
+              textEl.textContent = "허용됨";
+              requestBtn.classList.add("d-none");
+              break;
+            case "denied":
+              statusEl.classList.add("status-disabled");
+              textEl.textContent = "차단됨";
+              requestBtn.classList.add("d-none");
+              break;
+            default:
+              statusEl.classList.add("status-unknown");
+              textEl.textContent = "요청 필요";
+              requestBtn.classList.remove("d-none");
+          }
+        }
+
+        async updateSubscriptionStatus() {
+          const statusEl = document.getElementById("subscription-status");
+          const textEl = document.getElementById("subscription-text");
+          const toggleEl = document.getElementById("notification-toggle");
+
+          statusEl.className = "status-indicator";
+
+          if (!this.registration) {
+            statusEl.classList.add("status-disabled");
+            textEl.textContent = "Service Worker 미지원";
+            toggleEl.disabled = true;
+            return;
+          }
+
+          try {
+            const subscription =
+              await this.registration.pushManager.getSubscription();
+
+            if (subscription) {
+              statusEl.classList.add("status-enabled");
+              textEl.textContent = "구독 중";
+              toggleEl.checked = true;
+            } else {
+              statusEl.classList.add("status-disabled");
+              textEl.textContent = "미구독";
+              toggleEl.checked = false;
+            }
+          } catch (error) {
+            statusEl.classList.add("status-unknown");
+            textEl.textContent = "확인 실패";
+            console.error("구독 상태 확인 실패:", error);
+          }
+        }
+
+        updateDeviceStatus() {
+          const statusEl = document.getElementById("device-status");
+          const textEl = document.getElementById("device-text");
+
+          statusEl.className = "status-indicator";
+
+          if (this.deviceToken) {
+            statusEl.classList.add("status-enabled");
+            textEl.textContent = "연결됨";
+          } else {
+            statusEl.classList.add("status-disabled");
+            textEl.textContent = "미연결";
+          }
+        }
+
+        setupEventListeners() {
+          // 권한 요청 버튼
+          document
+            .getElementById("request-permission")
+            .addEventListener("click", async () => {
+              try {
+                const permission = await Notification.requestPermission();
+                this.updatePermissionStatus();
+
+                if (permission === "granted") {
+                  showToast("알림 권한이 허용되었습니다!", "success");
+                } else {
+                  showToast("알림 권한이 거부되었습니다.", "warning");
+                }
+              } catch (error) {
+                console.error("권한 요청 실패:", error);
+                showToast("권한 요청 중 오류가 발생했습니다.", "error");
+              }
+            });
+
+          // 알림 토글
+          document
+            .getElementById("notification-toggle")
+            .addEventListener("change", async (e) => {
+              if (e.target.checked) {
+                await this.subscribePush();
+              } else {
+                await this.unsubscribePush();
+              }
+            });
+
+          // 상태 새로고침
+          document
+            .getElementById("refresh-status")
+            .addEventListener("click", () => {
+              this.updateStatus();
+              showToast("상태를 새로고침했습니다.", "info");
+            });
+
+          // 테스트 알림
+          document
+            .getElementById("test-notification")
+            .addEventListener("click", async () => {
+              await this.sendTestNotification();
+            });
+        }
+
+        async subscribePush() {
+          try {
+            if (!this.registration || !this.vapidPublicKey) {
+              showToast("푸시 알림을 지원하지 않는 환경입니다.", "warning");
+              return;
+            }
+
+            const subscription = await this.registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: this.urlBase64ToUint8Array(
+                this.vapidPublicKey
+              ),
+            });
+
+            // 서버에 구독 정보 전송
+            const response = await fetch("/api/push/subscribe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                device_token: this.deviceToken,
+                subscription: {
+                  endpoint: subscription.endpoint,
+                  keys: {
+                    p256dh: this.arrayBufferToBase64(
+                      subscription.getKey("p256dh")
+                    ),
+                    auth: this.arrayBufferToBase64(subscription.getKey("auth")),
+                  },
+                },
+              }),
+            });
+
+            if (response.ok) {
+              showToast("푸시 알림 구독이 완료되었습니다!", "success");
+              this.updateSubscriptionStatus();
+            } else {
+              throw new Error("서버 등록 실패");
+            }
+          } catch (error) {
+            console.error("푸시 구독 실패:", error);
+            showToast("푸시 알림 구독에 실패했습니다.", "error");
+            document.getElementById("notification-toggle").checked = false;
+          }
+        }
+
+        async unsubscribePush() {
+          try {
+            const subscription =
+              await this.registration.pushManager.getSubscription();
+            if (subscription) {
+              await subscription.unsubscribe();
+
+              // 서버에 구독 해제 요청
+              await fetch("/api/push/unsubscribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  device_token: this.deviceToken,
+                }),
+              });
+            }
+
+            showToast("푸시 알림 구독이 해제되었습니다.", "info");
+            this.updateSubscriptionStatus();
+          } catch (error) {
+            console.error("푸시 구독 해제 실패:", error);
+            showToast("푸시 알림 구독 해제에 실패했습니다.", "error");
+          }
+        }
+
+        async sendTestNotification() {
+          try {
+            const response = await fetch("/api/push/test", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                device_token: this.deviceToken,
+                title: "테스트 알림",
+                body: "푸시 알림 설정이 제대로 작동하고 있어요! 🎉",
+              }),
+            });
+
+            if (response.ok) {
+              showToast("테스트 알림을 전송했습니다!", "success");
+            } else {
+              throw new Error("테스트 알림 전송 실패");
+            }
+          } catch (error) {
+            console.error("테스트 알림 실패:", error);
+            showToast("테스트 알림 전송에 실패했습니다.", "error");
+          }
+        }
+
+        urlBase64ToUint8Array(base64String) {
+          const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+          const base64 = (base64String + padding)
+            .replace(/-/g, "+")
+            .replace(/_/g, "/");
+
+          const rawData = window.atob(base64);
+          const outputArray = new Uint8Array(rawData.length);
+
+          for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+          }
+          return outputArray;
+        }
+
+        arrayBufferToBase64(buffer) {
+          const bytes = new Uint8Array(buffer);
+          let binary = "";
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          return window.btoa(binary);
+        }
+      }
+
+      // 토스트 메시지 표시 함수
+      function showToast(message, type = "info") {
+        const toastHtml = `
+                <div class="toast align-items-center text-white bg-${type} border-0 position-fixed"
+                     style="top: 20px; right: 20px; z-index: 9999;"
+                     role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="fas fa-${
+                              type === "success"
+                                ? "check"
+                                : type === "error"
+                                ? "exclamation"
+                                : "info"
+                            }-circle me-2"></i>
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                                data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+
+        document.body.insertAdjacentHTML("beforeend", toastHtml);
+
+        const toastElement = document.querySelector(".toast:last-child");
+        const toast = new bootstrap.Toast(toastElement, {
+          autohide: true,
+          delay: 3000,
+        });
+        toast.show();
+
+        // 자동 제거
+        toastElement.addEventListener("hidden.bs.toast", () => {
+          toastElement.remove();
+        });
+      }
+
+      // 페이지 로드 시 초기화
+      document.addEventListener("DOMContentLoaded", () => {
+        new PushNotificationManager();
+      });
+    </script>
+  </body>
+</html>

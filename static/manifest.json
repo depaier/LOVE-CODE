@@ -1,0 +1,24 @@
+{
+  "name": "사주 궁합 매칭 - LOVE-CODE",
+  "short_name": "LOVE-CODE",
+  "description": "AI 기반 사주 궁합 매칭 서비스",
+  "display": "standalone",
+  "start_url": "/",
+  "theme_color": "#ff69b4",
+  "background_color": "#ffffff",
+  "orientation": "portrait",
+  "categories": ["lifestyle", "entertainment"],
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/static/img/LOVECODE_ICON.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/LOVECODE_ICON.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

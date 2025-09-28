@@ -1,0 +1,24 @@
+{
+  "name": "saju-matching",
+  "version": "1.0.0",
+  "description": "사주와 MBTI를 기반으로 한 연애 매칭 서비스입니다.",
+  "main": "final_test_push.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/depaier/LOVE-CODE.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/depaier/LOVE-CODE/issues"
+  },
+  "homepage": "https://github.com/depaier/LOVE-CODE#readme",
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

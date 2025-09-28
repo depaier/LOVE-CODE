@@ -6,477 +6,48 @@ import os
 # from pywebpush import webpush  # 제거됨
 import json
 import uuid
-import re
-import time
-import gc  # 가비지 컬렉션용
 from datetime import datetime
 
 # 환경변수 로딩
 load_dotenv()
 
-# --- [사주 계산 함수 초고속 최적화 버전 + 캐싱] ---
-# 사주 계산 결과 캐시 (메모리 캐싱으로 동일 데이터 반복 계산 방지)
-saju_cache = {}
-
-# --- [사주 분석 결과 캐시] ---
-# 동일한 사주 + MBTI 조합에 대한 AI 분석 결과를 캐싱 (파일 기반)
-import json
-import os
-
-SAJU_CACHE_FILE = os.path.join(os.path.dirname(__file__), 'saju_cache.json')
-MATCHING_CACHE_FILE = os.path.join(os.path.dirname(__file__), 'matching_cache.json')
-
-# 전역 메모리 캐시 (파일 I/O 최소화)
-_global_matching_cache = None
-_cache_save_counter = 0
-
-def load_saju_cache():
-    """캐시 파일에서 사주 분석 캐시 로드"""
-    try:
-        if os.path.exists(SAJU_CACHE_FILE):
-            with open(SAJU_CACHE_FILE, 'r', encoding='utf-8') as f:
-                # MBTI별 캐시 로드 (키는 MBTI 문자열)
-                cache_data = json.load(f)
-                print(f"✅ 캐시 파일 로드 완료: {len(cache_data)}개 항목")
-                if 'ENFP' in cache_data:
-                    preview = cache_data['ENFP'][:100] + "..."
-                    print(f"📋 ENFP 템플릿 미리보기: {preview}")
-                return cache_data  # 그대로 반환
-    except Exception as e:
-        print(f"❌ 캐시 파일 로드 오류: {e}")
-    return {}
-
-def save_saju_cache(cache):
-    """사주 분석 캐시를 파일에 저장"""
-    try:
-        # MBTI별 캐시 저장 (키는 MBTI 문자열 그대로)
-        with open(SAJU_CACHE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(cache, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"캐시 파일 저장 오류: {e}")
-
-def load_matching_cache():
-    """매칭 호환성 캐시 로드 (크기 제한 및 검증 포함)"""
-    try:
-        if os.path.exists(MATCHING_CACHE_FILE):
-            # 파일 크기 확인 (10MB 제한)
-            file_size = os.path.getsize(MATCHING_CACHE_FILE)
-            if file_size > 10 * 1024 * 1024:  # 10MB
-                print(f"⚠️ 매칭 캐시 파일이 너무 큽니다 ({file_size/1024/1024:.1f}MB). 백업 후 초기화합니다.")
-                # 백업 생성
-                backup_file = f"{MATCHING_CACHE_FILE}.backup_{int(time.time())}"
-                os.rename(MATCHING_CACHE_FILE, backup_file)
-                return {}
-            
-            with open(MATCHING_CACHE_FILE, 'r', encoding='utf-8') as f:
-                content = f.read()
-                
-                # JSON 유효성 사전 검증
-                if not content.strip():
-                    return {}
-                
-                # 기본적인 JSON 형식 검증
-                if not (content.strip().startswith('{') and content.strip().endswith('}')):
-                    print("⚠️ 매칭 캐시 파일 형식이 잘못되었습니다. 초기화합니다.")
-                    return {}
-                
-                cache = json.loads(content)
-                print(f"📖 매칭 캐시 로드: {len(cache)}개 항목 ({file_size/1024:.1f}KB)")
-                return cache
-                
-    except json.JSONDecodeError as e:
-        print(f"⚠️ 매칭 캐시 JSON 파싱 오류: {e}")
-        # 손상된 파일 백업 후 초기화
-        if os.path.exists(MATCHING_CACHE_FILE):
-            backup_file = f"{MATCHING_CACHE_FILE}.error_backup_{int(time.time())}"
-            os.rename(MATCHING_CACHE_FILE, backup_file)
-            print(f"📁 손상된 캐시 파일을 {backup_file}로 백업했습니다.")
-        return {}
-    except Exception as e:
-        print(f"매칭 캐시 로드 오류: {e}")
-        return {}
-
-def save_matching_cache(cache):
-    """매칭 호환성 캐시 저장 (메모리 최적화)"""
-    try:
-        # 캐시 크기 제한 (1500개 항목으로 더 엄격하게)
-        if len(cache) > 1500:
-            print(f"⚠️ 매칭 캐시가 너무 큽니다 ({len(cache)}개). 최신 1000개만 유지합니다.")
-            # 최신 1000개만 유지 (키를 정렬해서)
-            sorted_keys = sorted(cache.keys())[-1000:]
-            cache = {k: cache[k] for k in sorted_keys}
-        
-        # 임시 파일에 먼저 저장 (원자적 쓰기, compact format)
-        temp_file = f"{MATCHING_CACHE_FILE}.tmp"
-        with open(temp_file, 'w', encoding='utf-8') as f:
-            json.dump(cache, f, ensure_ascii=False, separators=(',', ':'))  # compact format
-        
-        # 성공적으로 저장되면 원본 파일로 이동
-        os.rename(temp_file, MATCHING_CACHE_FILE)
-        
-    except Exception as e:
-        print(f"매칭 캐시 저장 오류: {e}")
-        # 임시 파일 정리
-        temp_file = f"{MATCHING_CACHE_FILE}.tmp"
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-
-def calculate_mbti_compatibility_score(mbti1, mbti2):
-    """MBTI 기반 호환성 점수 계산 (룰 기반)"""
-    score = 50  # 기본 호환성 점수
-
-    # 각 차원별 호환성 가산점
-    dimensions = [
-        (mbti1[0], mbti2[0], 15),  # I/E (외향성/내향성)
-        (mbti1[1], mbti2[1], 15),  # S/N (감각/직관)
-        (mbti1[2], mbti2[2], 10),  # T/F (사고/감정)
-        (mbti1[3], mbti2[3], 10),  # J/P (판단/인식)
-    ]
-
-    for dim1, dim2, points in dimensions:
-        if dim1 == dim2:
-            score += points
-
-    return max(20, min(100, score))
-
-def calculate_saju_compatibility_score(saju1, saju2):
-    """사주 기반 호환성 점수 계산 (룰 기반)"""
-    score = 60  # 기본 사주 호환성
-
-    try:
-        # 간단한 사주 요소 추출 및 비교
-        elements = ['목', '화', '토', '금', '수']
-
-        # 같은 오행 기운이 있는지 확인
-        common_elements = 0
-        for element in elements:
-            if element in saju1 and element in saju2:
-                common_elements += 1
-
-        # 상생/상극 관계 고려 (단순화)
-        if common_elements > 0:
-            score += common_elements * 8
-        else:
-            score -= 10  # 다른 기운은 약간 감점
-
-    except Exception:
-        pass  # 오류 시 기본 점수 유지
-
-    return max(30, min(100, score))
-
-def get_cached_matching_result(user1, user2):
-    """메모리 캐시에서 매칭 결과 조회 (파일 I/O 최소화)"""
-    global _global_matching_cache
-    
-    try:
-        # 첫 번째 호출시에만 파일에서 로드
-        if _global_matching_cache is None:
-            print("📖 매칭 캐시 초기 로드...")
-            _global_matching_cache = load_matching_cache()
-            print(f"✅ 캐시 로드 완료: {len(_global_matching_cache)}개 항목")
-        
-        # 정규화된 키 생성 (항상 ID 순으로 정렬)
-        key_parts = sorted([str(user1['id']), str(user2['id'])])
-        cache_key = f"{key_parts[0]}_{key_parts[1]}"
-        
-        # 캐시 확인
-        if cache_key in _global_matching_cache:
-            cached_result = _global_matching_cache[cache_key]
-            return cached_result['score'], cached_result['reason']
-            
-        return None
-    except Exception as e:
-        print(f"메모리 캐시 조회 오류: {e}")
-        return None
-
-def save_matching_result_to_cache(user1, user2, score, reason):
-    """메모리 캐시에 매칭 결과 저장 (주기적으로만 파일 저장)"""
-    global _global_matching_cache, _cache_save_counter
-    
-    try:
-        if _global_matching_cache is None:
-            _global_matching_cache = {}
-        
-        # 정규화된 키 생성
-        key_parts = sorted([str(user1['id']), str(user2['id'])])
-        cache_key = f"{key_parts[0]}_{key_parts[1]}"
-        
-        # 메모리 캐시에 저장
-        _global_matching_cache[cache_key] = {'score': score, 'reason': reason}
-        
-        # 카운터 증가 및 주기적 파일 저장 (100개마다)
-        _cache_save_counter += 1
-        if _cache_save_counter % 100 == 0:
-            save_matching_cache(_global_matching_cache)
-            print(f"💾 메모리 캐시 파일 저장: {len(_global_matching_cache)}개 항목")
-            
-    except Exception as e:
-        print(f"메모리 캐시 저장 오류: {e}")
-
-def calculate_rule_based_matching(user1, user2):
-    """룰 기반 매칭 계산"""
-    try:
-        # MBTI 호환성 계산
-        mbti_score = calculate_mbti_compatibility_score(user1['mbti'], user2['mbti'])
-
-        # 사주 호환성 계산
-        saju_score = calculate_saju_compatibility_score(user1['saju_result'], user2['saju_result'])
-
-        # 최종 점수 계산 (가중치 적용)
-        final_score = int((mbti_score * 0.6) + (saju_score * 0.4))
-        final_score = max(20, min(100, final_score))
-
-        # 사주 전문가 톤의 매칭 이유 생성
-        if final_score >= 85:
-            reason = f"천생연분의 궁합입니다. 사주의 오행이 조화롭게 어우러지고 MBTI 성향도 완벽히 맞아떨어집니다"
-        elif final_score >= 75:
-            reason = f"매우 좋은 인연입니다. 사주상 서로를 보완하며 MBTI 특성이 잘 맞아 화목한 관계를 이룰 수 있습니다"
-        elif final_score >= 65:
-            reason = f"좋은 궁합을 보입니다. 사주의 기운이 서로 도우며 성격적 특성도 안정적인 조화를 이룹니다"
-        elif final_score >= 55:
-            reason = f"평범하지만 나쁘지 않은 궁합입니다. 서로 노력한다면 좋은 관계로 발전할 수 있는 인연입니다"
-        else:
-            reason = f"다소 다른 기질을 가지고 있지만, 서로를 이해하려 노력한다면 새로운 배움이 있는 관계입니다"
-
-        return final_score, reason
-
-    except Exception as e:
-        print(f"❌ 룰 기반 매칭 계산 오류: {e}")
-        return 50, "성격 분석 결과 기본적인 호환성을 가진 관계입니다"
-
-def should_use_ai_matching(user1, user2, quick_score):
-    """AI 심층 분석을 사용할지 결정"""
-    # 85점 이상 초고호환성 쌍만 AI 분석 진행 (안정성 우선)
-    if quick_score >= 85:
-        print(f"🤖 AI 심층 분석 진행: {user1['name']} ↔ {user2['name']} (룰 기반: {quick_score}점)")
-        return True
-    else:
-        print(f"⚡ 룰 기반 결과 사용: {user1['name']} ↔ {user2['name']} (점수: {quick_score}점)")
-        return False
-
-def perform_ai_matching_analysis(user1, user2, quick_score, model):
-    """AI를 활용한 심층 매칭 분석"""
-    try:
-        # 최적화된 AI 프롬프트 (짧고 명확하게)
-        prompt = f"""
-다음 두 성격 유형의 궁합을 분석해주세요:
-
-첫 번째: {user1['mbti']}
-두 번째: {user2['mbti']}
-
-다음 형식으로만 30자 이내로 답변:
-점수: 80
-이유: 성격이 잘 맞음
-"""
-
-        # AI 호출 전 딜레이 (API 한도 방지)
-        time.sleep(0.3)  # 더 긴 딜레이로 안정성 확보
-        
-        print(f"🤖 AI 분석 시작: {user1['name']} ↔ {user2['name']}")
-        ai_start_time = time.time()
-        
-        # 타임아웃 강제 설정 (10초)
-        import threading
-        import queue
-        
-        # 결과를 담을 큐
-        result_queue = queue.Queue()
-        exception_queue = queue.Queue()
-        
-        def ai_call_with_timeout():
-            try:
-                # 안전 필터 설정을 더 관대하게 조정
-                safety_settings = [
-                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-                ]
-                
-                response = model.generate_content(
-                    prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.1,  # 더 일관성 있는 응답
-                        max_output_tokens=200,  # 충분한 토큰으로 완전한 응답 보장
-                    ),
-                    safety_settings=safety_settings
-                )
-                result_queue.put(response)
-            except Exception as e:
-                exception_queue.put(e)
-        
-        # 스레드로 AI 호출 실행
-        ai_thread = threading.Thread(target=ai_call_with_timeout)
-        ai_thread.daemon = True
-        ai_thread.start()
-        
-        # 10초 타임아웃으로 결과 대기
-        ai_thread.join(timeout=10.0)
-        
-        if ai_thread.is_alive():
-            ai_elapsed = time.time() - ai_start_time
-            print(f"⏰ AI 호출 타임아웃 ({ai_elapsed:.2f}초) - 강제 중단")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
-        
-        # 예외 확인
-        if not exception_queue.empty():
-            raise exception_queue.get()
-        
-        # 결과 확인
-        if result_queue.empty():
-            print(f"⚠️ AI 응답 없음 - 알 수 없는 오류")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
-        
-        response = result_queue.get()
-        
-        ai_elapsed = time.time() - ai_start_time
-        print(f"🤖 AI 응답 완료: {ai_elapsed:.2f}초")
-        
-        # 토큰 사용량 확인
-        if hasattr(response, 'usage_metadata') and response.usage_metadata:
-            usage = response.usage_metadata
-            print(f"📊 토큰 사용량 - 입력: {usage.prompt_token_count}, 출력: {usage.candidates_token_count}, 총: {usage.total_token_count}")
-        
-        # 안전성 검사
-        if not response.candidates or len(response.candidates) == 0:
-            print(f"⚠️ AI 응답 없음: 안전 필터 차단")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
-
-        candidate = response.candidates[0]
-        if candidate.finish_reason != 1:  # 1 = STOP (정상 완료)
-            print(f"⚠️ AI 응답 차단됨: finish_reason={candidate.finish_reason}")
-            if candidate.finish_reason == 2:
-                print(f"🚫 토큰 한도 초과 또는 안전 필터 차단")
-            elif candidate.finish_reason == 3:
-                print(f"🚫 최대 토큰 길이 초과")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
-            
-
-        try:
-            ai_response = response.text.strip()
-        except:
-            print(f"⚠️ AI 응답 텍스트 추출 실패")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
-
-        # AI 응답에서 점수와 이유 추출 (한국어 복원)
-        score_match = re.search(r'점수:\s*(\d+)', ai_response)
-        reason_match = re.search(r'이유:\s*(.+)', ai_response)
-
-        if score_match and reason_match:
-            ai_score = int(score_match.group(1))
-            ai_reason = reason_match.group(1).strip()
-
-            # 룰 기반과 AI 결과 조합
-            final_score = int((quick_score * 0.7) + (ai_score * 0.3))
-            final_score = max(20, min(100, final_score))
-
-            final_reason = ai_reason[:80] if len(ai_reason) > 80 else ai_reason
-
-            print(f"✅ AI 매칭 분석 완료: {user1['name']} ↔ {user2['name']} (최종 점수: {final_score})")
-            return final_score, final_reason
-        else:
-            # AI 분석 실패 시 룰 기반 결과 사용
-            print(f"⚠️ AI 분석 결과 파싱 실패, 룰 기반 결과 사용")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
-
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "quota" in error_msg or "limit" in error_msg:
-            print(f"⚠️ AI API 할당량 초과, 룰 기반 결과 사용")
-        elif "timeout" in error_msg:
-            print(f"⚠️ AI API 타임아웃, 룰 기반 결과 사용")
-        else:
-            print(f"❌ AI 매칭 분석 오류: {e}")
-        return quick_score, "사주의 기운과 성격을 살펴보니 기본적인 조화는 이루고 있는 인연입니다"
-
-# 캐시 초기화
-saju_analysis_cache = load_saju_cache()
-matching_cache = load_matching_cache()
-
+# --- [사주 계산 함수 부분 - 이전과 동일] ---
 def calculate_saju_pillars(year, month, day, hour):
-    # 캐시 키 생성
-    cache_key = (year, month, day, hour)
-
-    # 캐시 확인 (이미 계산된 결과가 있으면 즉시 반환)
-    if cache_key in saju_cache:
-        return saju_cache[cache_key]
-    # 천간과 지지 상수 (최적화된 배열)
     cheon_gan = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"]
     ji_ji = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"]
-
-    # 연주 계산 (수학적 계산으로 즉시 완료)
-    year_gan_index = (year - 4) % 10
-    year_ji_index = (year - 4) % 12
+    year_gan_index = (year - 4) % 10; year_ji_index = (year - 4) % 12
     year_pillar = cheon_gan[year_gan_index] + ji_ji[year_ji_index]
-
-    # 월주 계산 (lookup table로 즉시 완료)
     month_starts = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3]
+    gan_starts = ["병", "정", "무", "기", "경", "신", "임", "계", "갑", "을"]
+    ji_starts = ["인", "묘", "진", "사", "오", "미", "신", "유", "술", "해", "자", "축"]
     month_index = month_starts.index(month)
     month_gan_key = cheon_gan[year_gan_index]
-
-    # 초고속 간지 오프셋 매핑
-    gan_offset_map = {
-        "갑": 0, "기": 0,
-        "을": 2, "경": 2,
-        "병": 4, "신": 4,
-        "정": 6, "임": 6,
-        "무": 8, "계": 8
-    }
-    gan_offset = gan_offset_map.get(month_gan_key, 8)
-
-    # 월주 lookup table (미리 계산된 값들)
-    month_pillars = [
-        "병인", "정묘", "무진", "기사", "경오", "신미", "임신", "계유", "갑술", "을해", "병자", "정축",
-        "무인", "기묘", "경진", "신사", "임오", "계미", "갑신", "을유", "병술", "정해", "무자", "기축",
-        "경인", "신묘", "임진", "계사", "갑오", "을미", "병신", "정유", "무술", "기해", "경자", "신축",
-        "임인", "계묘", "갑진", "을사", "병오", "정미", "무신", "기유", "경술", "신해", "임자", "계축",
-        "갑인", "을묘", "병진", "정사", "무오", "기미", "경신", "신유", "임술", "계해", "갑자", "을축"
-    ]
-
-    # 월주 인덱스 계산 및 lookup
-    month_pillar_index = (year_gan_index * 12 + month_index) % 60
-    month_pillar = month_pillars[month_pillar_index]
-
-    # 일주 계산 (수학적 공식으로 즉시 계산 - 초고속)
-    # 2000년 1월 1일 (토요일) 기준으로 총 일수 계산
-    base_year = 2000
-    base_month = 1
-    base_day = 1
-
-    # 연도별 일수 계산 (윤년 고려)
-    total_days = (year - base_year) * 365 + (year - base_year) // 4 - (year - base_year) // 100 + (year - base_year) // 400
-
-    # 월별 누적 일수 (미리 계산된 값 사용)
-    cumulative_days = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
-
-    # 윤년 보정
-    leap_year_adjust = 1 if ((year % 4 == 0 and year % 100 != 0) or year % 400 == 0) and month > 2 else 0
-
-    total_days += cumulative_days[month - 1] + leap_year_adjust + (day - 1)
-
-    # 간지 계산 (수학적 공식)
-    day_gan_index = (total_days + 6) % 10  # 갑자일 기준
-    day_ji_index = (total_days + 8) % 12   # 자일 기준
-
+    if month_gan_key in ["갑", "기"]: gan_offset = 0
+    elif month_gan_key in ["을", "경"]: gan_offset = 2
+    elif month_gan_key in ["병", "신"]: gan_offset = 4
+    elif month_gan_key in ["정", "임"]: gan_offset = 6
+    else: gan_offset = 8
+    month_gan_index = (gan_offset + month_index) % 10
+    month_pillar = gan_starts[month_gan_index] + ji_starts[month_index]
+    total_days = 0
+    for y in range(1, year): total_days += 366 if (y % 4 == 0 and y % 100 != 0) or y % 400 == 0 else 365
+    days_in_month = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    if (year % 4 == 0 and year % 100 != 0) or year % 400 == 0: days_in_month[2] = 29
+    for m in range(1, month): total_days += days_in_month[m]
+    total_days += day
+    day_gan_index = (total_days + 6) % 10; day_ji_index = (total_days + 8) % 12
     day_pillar = cheon_gan[day_gan_index] + ji_ji[day_ji_index]
-
-    # 시주 계산 (lookup table로 즉시 완료)
-    # 시간별 지지 매핑 (더욱 효율적인 버전)
-    time_ji_indices = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11]
-    time_ji_index = time_ji_indices[hour]
-
-    # 시주 간지 오프셋
+    time_ji_map = {23:0, 0:0, 1:1, 2:1, 3:2, 4:2, 5:3, 6:3, 7:4, 8:4, 9:5, 10:5, 11:6, 12:6, 13:7, 14:7, 15:8, 16:8, 17:9, 18:9, 19:10, 20:10, 21:11, 22:11}
+    time_ji_index = time_ji_map[hour]
     day_gan_key = cheon_gan[day_gan_index]
-    time_gan_offset = gan_offset_map.get(day_gan_key, 8)
-    time_gan_index = (time_gan_offset + time_ji_index) % 10
-
+    if day_gan_key in ["갑", "기"]: gan_offset = 0
+    elif day_gan_key in ["을", "경"]: gan_offset = 2
+    elif day_gan_key in ["병", "신"]: gan_offset = 4
+    elif day_gan_key in ["정", "임"]: gan_offset = 6
+    else: gan_offset = 8
+    time_gan_index = (gan_offset + time_ji_index) % 10
     time_pillar = cheon_gan[time_gan_index] + ji_ji[time_ji_index]
-
-    # 계산 결과 캐시에 저장 (다음 호출 시 즉시 반환)
-    result = (year_pillar, month_pillar, day_pillar, time_pillar)
-    saju_cache[cache_key] = result
-
-    return result
+    return year_pillar, month_pillar, day_pillar, time_pillar
 # --- [사주 계산 함수 부분 끝] ---
 
 # 프로젝트 루트 경로 계산 (api 폴더에서 한 단계 위로)
@@ -930,7 +501,7 @@ def api_test():
 
         # 모델 테스트
         model_results = {}
-        test_models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash']
+        test_models = ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-pro']
         for model_name in test_models:
             model_valid, model_message = test_model(model_name)
             model_results[model_name] = {
@@ -949,62 +520,6 @@ def api_test():
 
     except Exception as e:
         return jsonify({'error': f'API 테스트 중 오류 발생: {e}'}), 500
-
-@app.route('/admin/api-quota')
-def check_api_quota():
-    """API 할당량 및 토큰 사용량 확인"""
-    if not session.get('logged_in'):
-        return jsonify({'error': '로그인이 필요합니다'}), 401
-
-    try:
-        if not GOOGLE_API_KEY:
-            return jsonify({'error': 'Google AI API 키가 설정되지 않았습니다.'}), 500
-        
-        genai.configure(api_key=GOOGLE_API_KEY)
-        
-        # 간단한 테스트 요청으로 토큰 사용량 확인
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        response = model.generate_content(
-            "Hello",
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=10,
-                temperature=0.1
-            )
-        )
-        
-        quota_info = {
-            'status': 'success',
-            'test_response': response.text if response.text else 'No response',
-            'finish_reason': response.candidates[0].finish_reason if response.candidates else 'No candidates',
-            'finish_reason_description': {
-                1: 'STOP (정상 완료)',
-                2: 'MAX_TOKENS (토큰 한도 도달) 또는 SAFETY (안전 필터)',
-                3: 'RECITATION (반복/인용)',
-                4: 'OTHER (기타)'
-            }
-        }
-        
-        # 토큰 사용량 정보
-        if hasattr(response, 'usage_metadata') and response.usage_metadata:
-            usage = response.usage_metadata
-            quota_info['token_usage'] = {
-                'prompt_tokens': usage.prompt_token_count,
-                'completion_tokens': usage.candidates_token_count,
-                'total_tokens': usage.total_token_count
-            }
-        else:
-            quota_info['token_usage'] = {
-                'message': '토큰 사용량 정보를 가져올 수 없습니다'
-            }
-        
-        return jsonify(quota_info)
-        
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e),
-            'message': '할당량 확인 중 오류가 발생했습니다.'
-        }), 500
 
 @app.route('/admin/result/<int:result_id>')
 def get_result_detail(result_id):
@@ -1040,123 +555,122 @@ def delete_result(result_id):
     except Exception as e:
         return jsonify({'error': f'삭제 중 오류 발생: {e}'}), 500
 
-def perform_batch_matching(user_group_1, user_group_2, model, batch_name="", timeout_callback=None):
-    """상위 3명 제한 최적화 매칭 (룰 기반 → 상위 3명 선별 → AI 심층 분석)"""
-    print(f"🚀 {batch_name} 매칭 시작: {len(user_group_1)}명 × {len(user_group_2)}명")
-    print("📊 전략: 전체 룰 기반 계산 → 인당 상위 3명 선별 → AI 심층 분석")
-    
-    last_progress_time = time.time()
-    
-    # 1단계: 각 사용자에 대해 모든 상대방과의 룰 기반 점수 계산
-    print(f"📊 1단계: 룰 기반 점수 계산 중...")
-    user_candidates = {}  # user1_id -> [(user2, score, reason), ...]
+def perform_batch_matching(user_group_1, user_group_2, model, batch_name=""):
+    """배치 단위로 매칭 분석 수행"""
+    batch_matches = []
+
+    print(f"🔄 {batch_name} 매칭 분석 중... ({len(user_group_1)}명 × {len(user_group_2)}명 = {len(user_group_1) * len(user_group_2)}쌍)")
 
     for i, user1 in enumerate(user_group_1):
-        current_time = time.time()
-        
-        # 타임아웃 확인
-        if timeout_callback and timeout_callback(current_time):
-            print(f"⏰ 타임아웃 감지: {batch_name} 1단계 중단")
-            break
-        
-        # 무응답 감지 (7초로 단축)
-        if current_time - last_progress_time > 7:
-            print(f"⚠️ 무응답 감지: {batch_name} 1단계 7초 동안 진행 없음")
-            print(f"🔄 현재 시간: {current_time:.2f}, 마지막 진행: {last_progress_time:.2f}")
-            break
-        
-        # 진행률 표시 (10개마다)
-        if i % 10 == 0:
-            progress = (i / len(user_group_1)) * 100
-            print(f"📊 룰 기반 계산 진행률: {progress:.1f}% ({i}/{len(user_group_1)})")
-            last_progress_time = current_time
-        
-        candidates = []
-        
-        for user2 in user_group_2:
+        for j, user2 in enumerate(user_group_2):
             if user1['id'] == user2['id']:
-                continue  # 자기 자신 제외
-            
-            # 캐시 없이 바로 룰 기반 계산 (최대 속도)
-            score, reason = calculate_rule_based_matching(user1, user2)
-            print(f"⚡ 룰 기반 계산: {user1['name']} ↔ {user2['name']} (점수: {score})")
-            
-            # 70점 이상만 후보에 추가
-            if score >= 70:
-                candidates.append((user2, score, reason))
-        
-        # 점수 높은 순으로 정렬하여 상위 3명 선택
-        candidates.sort(key=lambda x: x[1], reverse=True)
-        top_3_candidates = candidates[:3]
-        
-        user_candidates[user1['id']] = top_3_candidates
-        
-        if top_3_candidates:
-            print(f"🎯 {user1['name']} 상위 3명 선별: {[(c[0]['name'], c[1]) for c in top_3_candidates]}")
-        
-        # 진행 시간 업데이트
-        last_progress_time = time.time()
-    
-    # 2단계: 선별된 상위 3명에 대해서만 AI 심층 분석
-    print(f"📊 2단계: 선별된 후보들 AI 심층 분석...")
-    
-    matches = []
-    ai_analysis_count = 0
-    
-    total_users = len(user_group_1)
-    processed_users = 0
-    
-    for user1 in user_group_1:
-        processed_users += 1
-        current_time = time.time()
-        
-        print(f"👤 사용자 {processed_users}/{total_users} 처리 중: {user1['name']} ({(processed_users/total_users)*100:.1f}%)")
-        
-        # 타임아웃 확인
-        if timeout_callback and timeout_callback(current_time):
-            print(f"⏰ 타임아웃 감지: {batch_name} AI 분석 중단")
-            break
-        
-        candidates = user_candidates.get(user1['id'], [])
-        
-        for user2, rule_score, rule_reason in candidates:
-            print(f"🤖 AI 심층 분석: {user1['name']} ↔ {user2['name']} (룰 기반: {rule_score}점)")
-            ai_analysis_count += 1
-            
-            # AI 호출 간격 조절 (메모리 및 API 안정성)
-            if ai_analysis_count % 5 == 0:  # 5번마다로 빈도 증가
-                time.sleep(1.0)  # 더 긴 휴식으로 안정성 확보
-                gc.collect()  # 가비지 컬렉션으로 메모리 정리
-                print(f"⏸️ AI 분석 휴식: {ai_analysis_count}회 완료 (메모리 정리)")
-                
-                # 매 10회마다 상태 로그만 출력
-                if ai_analysis_count % 10 == 0:
-                    print(f"📊 AI 분석 진행: {ai_analysis_count}회 완료")
-            
-            # 매 AI 호출마다 진행 상황 출력 (무한 대기 방지)
-            print(f"🤖 AI 호출 준비: {user1['name']} ↔ {user2['name']} ({ai_analysis_count}번째)")
-            
-            # AI 심층 분석 수행
-            final_score, final_reason = perform_ai_matching_analysis(user1, user2, rule_score, model)
-            
-            # 캐시 저장 완전 제거 - 속도 최우선
-            
-            # 매칭 결과에 추가
-            matches.append({
+                continue  # 자기 자신과의 매칭 제외
+
+            try:
+                # AI에게 호환성 분석 요청 (간단 버전)
+                prompt = f"""
+                {user1['name']}({user1['mbti']}, 사주:{user1['saju_result']}) ↔ {user2['name']}({user2['mbti']}, 사주:{user2['saju_result']})
+
+                사주와 MBTI 기반 호환성 분석:
+                사주 호환성: [1-50점]
+                MBTI 호환성: [1-50점]
+                최종 호환성 점수: [1-100점]
+                매칭 이유: [간단한 이유 설명]
+                """
+
+                response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(
+                    temperature=0.7,
+                    max_output_tokens=200,  # 더 짧게 제한
+                ))
+
+                if response is None:
+                    print(f"⚠️ AI 응답이 None: {user1['name']} ↔ {user2['name']}")
+                    continue
+
+                ai_result = response.text.strip() if response.text else ""
+
+                # HTML 에러 응답 체크 (JSON 파싱 오류 방지)
+                if not ai_result or ai_result.startswith('<!DOCTYPE') or '<html' in ai_result.lower():
+                    print(f"⚠️ HTML 에러 응답 감지: {user1['name']} ↔ {user2['name']}")
+                    continue
+
+                # 점수 파싱 (간소화) - MBTI 기반 기본값 설정
+                mbti1 = user1['mbti']
+                mbti2 = user2['mbti']
+
+                # MBTI 호환성 기본값 설정
+                if mbti1[0] == mbti2[0]:  # 같은 성향 (I/E, S/N, T/F, J/P)
+                    mbti_score = 35
+                elif mbti1[1] == mbti2[1] or mbti1[2] == mbti2[2] or mbti1[3] == mbti2[3]:
+                    mbti_score = 25
+                else:
+                    mbti_score = 15
+
+                saju_score = 25  # 사주 기본값
+                compatibility_score = saju_score + mbti_score
+
+                lines = ai_result.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if '사주 호환성:' in line:
+                        try:
+                            score_text = line.split('사주 호환성:')[1].strip()
+                            import re
+                            score_match = re.search(r'\d+', score_text)
+                            if score_match:
+                                saju_score = min(50, max(1, int(score_match.group())))
+                        except:
+                            pass
+                    elif 'MBTI 호환성:' in line:
+                        try:
+                            score_text = line.split('MBTI 호환성:')[1].strip()
+                            import re
+                            score_match = re.search(r'\d+', score_text)
+                            if score_match:
+                                mbti_score = min(50, max(1, int(score_match.group())))
+                        except:
+                            pass
+                    elif '최종 호환성 점수:' in line:
+                        try:
+                            score_text = line.split('최종 호환성 점수:')[1].strip()
+                            import re
+                            score_match = re.search(r'\d+', score_text)
+                            if score_match:
+                                calculated_score = min(100, max(1, int(score_match.group())))
+                                manual_score = saju_score + mbti_score
+                                if abs(calculated_score - manual_score) <= 10:
+                                    compatibility_score = calculated_score
+                                else:
+                                    compatibility_score = manual_score
+                        except:
+                            compatibility_score = saju_score + mbti_score
+
+                # 매칭 이유 추출 (간단하게)
+                matching_reason = f"{user1['name']}님과 {user2['name']}님은 {compatibility_score}점 호환성입니다."
+                if '매칭 이유:' in ai_result:
+                    try:
+                        reason_part = ai_result.split('매칭 이유:', 1)[1].strip()
+                        if reason_part and len(reason_part) > 5:
+                            matching_reason = reason_part[:100]  # 100자로 제한
+                    except:
+                        pass
+
+                batch_matches.append({
                     'user1_id': user1['id'],
                     'user2_id': user2['id'],
                     'user1_name': user1['name'],
                     'user2_name': user2['name'],
-                'compatibility_score': final_score,
-                'matching_reason': final_reason
-            })
-            print(f"✅ {batch_name}: {user1['name']} ↔ {user2['name']} (최종 점수: {final_score})")
-            
-            # 진행 시간 업데이트
-            last_progress_time = time.time()
-    
-    print(f"🏁 {batch_name} 매칭 완료: {len(matches)}개 결과 (AI 분석: {ai_analysis_count}회)")
-    return matches
+                    'compatibility_score': compatibility_score,
+                    'matching_reason': matching_reason
+                })
+
+                print(f"✅ {batch_name} {i+1}-{j+1}: {user1['name']} ↔ {user2['name']} (점수: {compatibility_score})")
+
+            except Exception as e:
+                print(f"❌ {batch_name} 매칭 실패 {user1['name']} ↔ {user2['name']}: {str(e)[:50]}...")
+                continue
+
+    return batch_matches
 
 @app.route('/admin/matching', methods=['POST'])
 def perform_matching():
@@ -1166,11 +680,6 @@ def perform_matching():
         print("🔧 개발 환경에서 세션 체크 우회")
     elif not session.get('logged_in'):
         return jsonify({'error': '로그인이 필요합니다'}), 401
-
-    # 매칭 시작 시간 기록 및 타임아웃 감지
-    matching_start_time = time.time()
-    max_matching_time = 600  # 10분 타임아웃
-    last_activity_time = matching_start_time
 
     try:
         # Supabase에서 데이터 조회
@@ -1198,13 +707,19 @@ def perform_matching():
         if len(new_users) == 0:
             return jsonify({'error': '매칭할 새로운 사용자가 없습니다'}), 400
 
-        if len(existing_users) == 0 and len(new_users) < 2:
+        # 새로운 사용자만 있는 경우 (새로운 사용자들끼리 매칭)
+        if len(existing_users) == 0:
+            if len(new_users) < 2:
                 return jsonify({'error': '매칭을 위해 최소 2명의 사용자가 필요합니다'}), 400
+        # 기존 사용자와 새로운 사용자가 모두 있는 경우
+        else:
+            if len(new_users) == 0:
+                return jsonify({'error': '매칭할 새로운 사용자가 없습니다'}), 400
 
-        # 대규모 매칭 지원을 위한 사용자 수 제한 해제
+        # Vercel 타임아웃 방지를 위한 사용자 수 제한
         total_users = len(new_users) + len(existing_users)
-        # 제한 제거 - 대규모 매칭 가능
-        print(f"📊 대규모 매칭 모드: 총 {total_users}명 처리 (제한 없음)")
+        if total_users > 20:
+            return jsonify({'error': f'한 번에 너무 많은 사용자를 처리할 수 없습니다. 현재 {total_users}명, 최대 20명까지 가능합니다.'}), 400
 
         print(f"📊 매칭 대상: 새로운 사용자 {len(new_users)}명, 기존 사용자 {len(existing_users)}명 (총 {total_users}명)")
 
@@ -1272,7 +787,7 @@ def perform_matching():
             return jsonify({'error': 'Google AI API 키가 설정되지 않아 매칭을 수행할 수 없습니다. 관리자에게 문의해주세요.'}), 500
 
         # Vercel 환경 최적화: 간단한 모델만 사용
-        model_names = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash']  # 2.0-Flash 우선 (안정성 검증됨)
+        model_names = ['gemini-2.0-flash', 'gemini-1.5-pro']  # 2.0-flash 제외 (더 안정적임)
         model = None
         for model_name in model_names:
             try:
@@ -1288,61 +803,433 @@ def perform_matching():
         if model is None:
             return jsonify({'error': '사용 가능한 AI 모델을 찾을 수 없습니다. API 키와 모델 설정을 확인해주세요.'}), 500
 
-        # 1. 최적화된 배치 매칭 분석 수행
-        print("💑 최적화된 매칭 분석 시작...")
-        all_matches = []
+        # 1. 성별 기반 매칭 분석 수행
+        print("💑 매칭 분석 시작...")
 
-        # 타임아웃 체크 함수 정의
-        def check_timeout(current_time):
-            elapsed = current_time - matching_start_time
-            if elapsed > max_matching_time:
-                print(f"⏰ 매칭 타임아웃: {elapsed:.1f}초 경과 (제한: {max_matching_time}초)")
-                return True
-            return False
+        # 우선순위 1: 기존 남자 × 새로운 여자 매칭 (새로운 여자들을 우선 매칭)
+        if len(existing_males) > 0 and len(new_females) > 0:
+            print(f"🎯 우선순위 1: 기존 남자({len(existing_males)}명) × 새로운 여자({len(new_females)}명) 매칭 분석 중...")
+            for user1 in existing_males:
+                for user2 in new_females:
+                    try:
+                        # 간단한 호환성 분석 요청 (최적화)
+                        prompt = f"""두 사람의 사주와 MBTI를 고려하여 연애 호환성을 분석하세요.
 
-        # 새로운 남자 × 기존 여자 매칭
-        if new_males and existing_females:
-            print(f"🚀 남자↔여자 매칭 시작... ({len(new_males)}×{len(existing_females)})")
-            male_female_matches = perform_batch_matching(
-                new_males, existing_females, model, "남자↔여자", check_timeout
-            )
-            all_matches.extend(male_female_matches)
-            
-            # 중간 타임아웃 체크
-            if check_timeout(time.time()):
-                raise TimeoutError("매칭 처리 시간이 초과되었습니다")
+사용자1: {user1['name']} ({user1['mbti']}) - 사주: {user1['saju_result']}
+사용자2: {user2['name']} ({user2['mbti']}) - 사주: {user2['saju_result']}
 
-        # 새로운 여자 × 기존 남자 매칭  
-        if new_females and existing_males:
-            print(f"🚀 여자↔남자 매칭 시작... ({len(new_females)}×{len(existing_males)})")
-            female_male_matches = perform_batch_matching(
-                new_females, existing_males, model, "여자↔남자", check_timeout
-            )
-            all_matches.extend(female_male_matches)
-            
-            # 중간 타임아웃 체크
-            if check_timeout(time.time()):
-                raise TimeoutError("매칭 처리 시간이 초과되었습니다")
+응답 형식:
+사주 호환성: [1-50]
+MBTI 호환성: [1-50]
+최종 호환성 점수: [2-100]
+매칭 이유: [간단한 한 문장 설명]"""
 
-        # 새로운 사용자들끼리 매칭
-        if new_males and new_females:
-            print(f"🚀 새로운사용자내 매칭 시작... ({len(new_males)}×{len(new_females)})")
-            internal_matches = perform_batch_matching(
-                new_males, new_females, model, "새로운사용자내", check_timeout
-            )
-            all_matches.extend(internal_matches)
+                        print(f"🤖 AI 호출 시도: {user1['name']} ↔ {user2['name']}")
+                        print(f"📝 Prompt 길이: {len(prompt)} 문자")
 
-        # 모든 매칭 결과를 all_pair_scores 형식으로 변환
-        all_pair_scores = []
-        for match in all_matches:
+                        # Vercel 환경용 타임아웃 설정 및 재시도 로직
+                        max_retries = 2
+                        retry_delay = 1
+
+                        response = None
+                        for attempt in range(max_retries + 1):
+                            try:
+                                if attempt > 0:
+                                    print(f"🔄 재시도 {attempt}/{max_retries}...")
+                                    import time
+                                    time.sleep(retry_delay)
+
+                                # 타임아웃 설정 (Vercel용으로 짧게)
+                                response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(
+                                temperature=0.7,
+                                max_output_tokens=500,  # 응답 길이 제한
+                            ))
+                                break  # 성공하면 루프 탈출
+
+                            except Exception as retry_error:
+                                print(f"❌ AI 호출 시도 {attempt + 1} 실패: {retry_error}")
+                                if attempt == max_retries:
+                                    raise Exception(f"AI API 호출 실패 (최대 재시도 횟수 초과): {retry_error}")
+                                continue
+
+                    # 응답이 None인지 확인
+                    if response is None:
+                        raise Exception("AI 응답이 None입니다")
+
+                    ai_result = response.text.strip() if response.text else ""
+
+                    # AI 응답이 비어있는지 확인
+                    if not ai_result:
+                        raise Exception("AI 응답이 비어있습니다")
+
+                    print(f"✅ AI 응답 받음: 길이 {len(ai_result)} 문자")
+
+                    # HTML 응답인지 확인 (에러 페이지가 반환된 경우)
+                    if ai_result.startswith('<!DOCTYPE') or '<html' in ai_result.lower():
+                        raise Exception(f"HTML 에러 페이지가 반환되었습니다. API 키나 모델 설정을 확인해주세요. 응답 내용: {ai_result[:200]}...")
+
+                    # AI 응답 파싱 (개선된 가중치 기반 점수 계산)
+                    lines = ai_result.split('\n')
+                    saju_score = 20  # 사주 호환성 기본값 (40점 만점의 절반)
+                    mbti_score = 30  # MBTI 호환성 기본값 (60점 만점의 절반)
+                    compatibility_score = 50  # 최종 호환성 점수 기본값
+                    matching_reason = ai_result  # 기본값으로 전체 응답 저장
+
+                    # 더 정확한 파싱을 위해 여러 패턴 시도
+                    reason_found = False
+
+                    for line in lines:
+                        line = line.strip()
+                        if '사주 호환성:' in line:
+                            try:
+                                score_text = line.split('사주 호환성:')[1].strip()
+                                import re
+                                score_match = re.search(r'\d+', score_text)
+                                if score_match:
+                                    saju_score = int(score_match.group())
+                                    saju_score = max(1, min(40, saju_score))
+                                    print(f"✅ 사주 호환성 파싱 성공: {saju_score}/40")
+                            except Exception as parse_error:
+                                print(f"❌ 사주 호환성 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
+                        elif 'MBTI 호환성:' in line:
+                            try:
+                                score_text = line.split('MBTI 호환성:')[1].strip()
+                                import re
+                                score_match = re.search(r'\d+', score_text)
+                                if score_match:
+                                    mbti_score = int(score_match.group())
+                                    mbti_score = max(1, min(60, mbti_score))
+                                    print(f"✅ MBTI 호환성 파싱 성공: {mbti_score}/60")
+                            except Exception as parse_error:
+                                print(f"❌ MBTI 호환성 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
+                        elif '최종 호환성 점수:' in line:
+                            try:
+                                score_text = line.split('최종 호환성 점수:')[1].strip()
+                                import re
+                                score_match = re.search(r'\d+', score_text)
+                                if score_match:
+                                    calculated_score = int(score_match.group())
+                                    calculated_score = max(1, min(100, calculated_score))
+                                    # 계산된 점수와 수동 계산 점수 비교 (일관성 검증)
+                                    manual_score = int((saju_score * 0.4) + (mbti_score * 0.6))
+                                    if abs(calculated_score - manual_score) <= 5:  # 5점 이내 오차 허용
+                                        compatibility_score = calculated_score
+                                        print(f"✅ 최종 호환성 점수 파싱 성공: {compatibility_score} (계산값: {manual_score})")
+                                    else:
+                                        # 일관성이 없으면 수동 계산값 사용
+                                        compatibility_score = manual_score
+                                        print(f"⚠️ 점수 불일치로 수동 계산값 사용: {compatibility_score} (AI: {calculated_score})")
+                                else:
+                                    # AI가 최종 점수를 제공하지 않은 경우 수동 계산
+                                    compatibility_score = int((saju_score * 0.4) + (mbti_score * 0.6))
+                                    print(f"✅ 수동 계산된 호환성 점수: {compatibility_score} (사주: {saju_score}, MBTI: {mbti_score})")
+                            except Exception as parse_error:
+                                print(f"❌ 최종 호환성 점수 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
+                                # 오류 시 수동 계산으로 폴백
+                                compatibility_score = int((saju_score * 0.4) + (mbti_score * 0.6))
+                                print(f"✅ 오류로 인한 수동 계산: {compatibility_score}")
+                        elif '매칭 이유:' in line and not reason_found:
+                            try:
+                                reason_text = line.split('매칭 이유:', 1)[1].strip()
+                                if reason_text and len(reason_text) > 3:  # 너무 짧지 않은 경우
+                                    matching_reason = reason_text[:150]  # 150자 제한
+                                    reason_found = True
+                            except:
+                                pass
+
+                    # 최종 검증 (간소화)
+                    if not matching_reason or len(matching_reason.strip()) < 5:
+                        matching_reason = f"{user1['name']}님과 {user2['name']}님은 {compatibility_score}점 호환성입니다."
+
+                    print(f"📊 결과 - 점수: {compatibility_score}, 이유: {matching_reason[:50]}...")
+
+                    # 모든 매칭 분석 결과를 저장 (중복 포함)
                     all_pair_scores.append({
-                'user1_id': match['user1_id'],
-                'user2_id': match['user2_id'],
-                'user1_name': match['user1_name'],
-                'user2_name': match['user2_name'],
-                'compatibility_score': match['compatibility_score'],
-                'matching_reason': match['matching_reason']
-            })
+                        'user1_id': user1['id'],
+                        'user2_id': user2['id'],
+                        'user1_name': user1['name'],
+                        'user2_name': user2['name'],
+                        'compatibility_score': compatibility_score,
+                        'matching_reason': matching_reason
+                    })
+
+                    print(f"✅ 매칭 분석 완료: {user1['name']} ↔ {user2['name']} (점수: {compatibility_score})")
+
+                except Exception as e:
+                    error_msg = f"매칭 분석 중 오류 발생 ({user1['name']} ↔ {user2['name']}): {str(e)}"
+                    print(f"❌ {error_msg}")
+                    print(f"❌ 오류 타입: {type(e).__name__}")
+                    import traceback
+                    print(f"❌ 상세 오류: {traceback.format_exc()}")
+
+                    # 치명적인 오류인 경우 전체 매칭을 중단
+                    if "HTML 에러 페이지" in str(e) or "API 키" in str(e):
+                        return jsonify({'error': f'AI API 호출 중 오류가 발생했습니다: {str(e)}'}), 500
+
+                    # 그 외의 오류는 이 쌍만 건너뛰고 계속 진행
+                    continue
+
+        # 우선순위 2: 새로운 남자 × 기존 여자 매칭
+        if len(new_males) > 0 and len(existing_females) > 0:
+            print(f"🎯 우선순위 2: 새로운 남자({len(new_males)}명) × 기존 여자({len(existing_females)}명) 매칭 분석 중...")
+            for user1 in new_males:
+                for user2 in existing_females:
+                    try:
+                    # 간단한 호환성 분석 요청 (최적화)
+                    prompt = f"""두 사람의 사주와 MBTI를 고려하여 연애 호환성을 분석하세요.
+
+사용자1: {user1['name']} ({user1['mbti']}) - 사주: {user1['saju_result']}
+사용자2: {user2['name']} ({user2['mbti']}) - 사주: {user2['saju_result']}
+
+응답 형식:
+사주 호환성: [1-50]
+MBTI 호환성: [1-50]
+최종 호환성 점수: [2-100]
+매칭 이유: [간단한 한 문장 설명]"""
+
+                    response = model.generate_content(prompt)
+
+                    # 응답이 None인지 확인
+                    if response is None:
+                        raise Exception("AI 응답이 None입니다")
+
+                    ai_result = response.text.strip() if response.text else ""
+
+                    # AI 응답이 비어있는지 확인
+                    if not ai_result:
+                        raise Exception("AI 응답이 비어있습니다")
+
+                    # HTML 응답인지 확인 (에러 페이지가 반환된 경우)
+                    if ai_result.startswith('<!DOCTYPE') or '<html' in ai_result.lower():
+                        raise Exception(f"HTML 에러 페이지가 반환되었습니다. API 키나 모델 설정을 확인해주세요. 응답 내용: {ai_result[:200]}...")
+
+                    # AI 응답 파싱 (사주 + MBTI 점수 합산 방식)
+                    lines = ai_result.split('\n')
+                    saju_score = 25  # 사주 호환성 기본값 (50점 만점의 절반)
+                    mbti_score = 25  # MBTI 호환성 기본값 (50점 만점의 절반)
+                    compatibility_score = 50  # 최종 호환성 점수 기본값
+                    matching_reason = ai_result  # 기본값으로 전체 응답 저장
+                    reason_found = False
+
+                    # 더 정확한 파싱을 위해 여러 패턴 시도
+                    for line in lines:
+                        line = line.strip()
+                        if '사주 호환성:' in line:
+                            try:
+                                score_text = line.split('사주 호환성:')[1].strip()
+                                import re
+                                score_match = re.search(r'\d+', score_text)
+                                if score_match:
+                                    saju_score = int(score_match.group())
+                                    saju_score = max(1, min(50, saju_score))
+                                    print(f"✅ 사주 호환성 파싱 성공: {saju_score}/50")
+                            except Exception as parse_error:
+                                print(f"❌ 사주 호환성 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
+                        elif 'MBTI 호환성:' in line:
+                            try:
+                                score_text = line.split('MBTI 호환성:')[1].strip()
+                                import re
+                                score_match = re.search(r'\d+', score_text)
+                                if score_match:
+                                    mbti_score = int(score_match.group())
+                                    mbti_score = max(1, min(50, mbti_score))
+                                    print(f"✅ MBTI 호환성 파싱 성공: {mbti_score}/50")
+                            except Exception as parse_error:
+                                print(f"❌ MBTI 호환성 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
+                        elif '최종 호환성 점수:' in line:
+                            try:
+                                score_text = line.split('최종 호환성 점수:')[1].strip()
+                                import re
+                                score_match = re.search(r'\d+', score_text)
+                                if score_match:
+                                    calculated_score = int(score_match.group())
+                                    calculated_score = max(1, min(100, calculated_score))
+                                    # 계산된 점수와 수동 계산 점수 비교 (일관성 검증)
+                                    manual_score = saju_score + mbti_score
+                                    if abs(calculated_score - manual_score) <= 5:  # 5점 이내 오차 허용
+                                        compatibility_score = calculated_score
+                                        print(f"✅ 최종 호환성 점수 파싱 성공: {compatibility_score} (계산값: {manual_score})")
+                                    else:
+                                        # 일관성이 없으면 수동 계산값 사용
+                                        compatibility_score = manual_score
+                                        print(f"⚠️ 점수 불일치로 수동 계산값 사용: {compatibility_score} (AI: {calculated_score})")
+                                else:
+                                    # AI가 최종 점수를 제공하지 않은 경우 수동 계산
+                                    compatibility_score = saju_score + mbti_score
+                                    print(f"✅ 수동 계산된 호환성 점수: {compatibility_score} (사주: {saju_score}, MBTI: {mbti_score})")
+                            except Exception as parse_error:
+                                print(f"❌ 최종 호환성 점수 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
+                                # 오류 시 수동 계산으로 폴백
+                                compatibility_score = saju_score + mbti_score
+                                print(f"✅ 오류로 인한 수동 계산: {compatibility_score}")
+                        elif '매칭 이유:' in line and not reason_found:
+                            try:
+                                reason_text = line.split('매칭 이유:', 1)[1].strip()
+                                if reason_text and len(reason_text) > 3:  # 너무 짧지 않은 경우
+                                    matching_reason = reason_text[:150]  # 150자 제한
+                                    reason_found = True
+                            except:
+                                pass
+
+                    # 최종 검증 (간소화)
+                    if not matching_reason or len(matching_reason.strip()) < 5:
+                        matching_reason = f"{user1['name']}님과 {user2['name']}님은 {compatibility_score}점 호환성입니다."
+
+                    print(f"📊 결과 - 점수: {compatibility_score}, 이유: {matching_reason[:50]}...")
+
+                    # 모든 매칭 분석 결과를 저장 (중복 포함)
+                    all_pair_scores.append({
+                        'user1_id': user1['id'],
+                        'user2_id': user2['id'],
+                        'user1_name': user1['name'],
+                        'user2_name': user2['name'],
+                        'compatibility_score': compatibility_score,
+                        'matching_reason': matching_reason
+                    })
+
+                    print(f"✅ 매칭 분석 완료: {user1['name']} ↔ {user2['name']} (점수: {compatibility_score})")
+
+                except Exception as e:
+                    error_msg = f"매칭 분석 중 오류 발생 ({user1['name']} ↔ {user2['name']}): {str(e)}"
+                    print(f"❌ {error_msg}")
+
+                    # 치명적인 오류인 경우 전체 매칭을 중단
+                    if "HTML 에러 페이지" in str(e) or "API 키" in str(e):
+                        return jsonify({'error': f'AI API 호출 중 오류가 발생했습니다: {str(e)}'}), 500
+
+                    # 그 외의 오류는 이 쌍만 건너뛰고 계속 진행
+                    continue
+
+        # 우선순위 3: 새로운 남자 × 새로운 여자 매칭 (새로운 사용자들끼리의 매칭)
+        if len(new_males) > 0 and len(new_females) > 0:
+            print(f"🎯 우선순위 3: 새로운 남자({len(new_males)}명) × 새로운 여자({len(new_females)}명) 매칭 분석 중...")
+            for user1 in new_males:
+                for user2 in new_females:
+                try:
+                    # 간단한 호환성 분석 요청 (최적화)
+                    prompt = f"""두 사람의 사주와 MBTI를 고려하여 연애 호환성을 분석하세요.
+
+사용자1: {user1['name']} ({user1['mbti']}) - 사주: {user1['saju_result']}
+사용자2: {user2['name']} ({user2['mbti']}) - 사주: {user2['saju_result']}
+
+응답 형식:
+사주 호환성: [1-50]
+MBTI 호환성: [1-50]
+최종 호환성 점수: [2-100]
+매칭 이유: [간단한 한 문장 설명]"""
+
+                    response = model.generate_content(prompt)
+
+                    # 응답이 None인지 확인
+                    if response is None:
+                        raise Exception("AI 응답이 None입니다")
+
+                    ai_result = response.text.strip() if response.text else ""
+
+                    # AI 응답이 비어있는지 확인
+                    if not ai_result:
+                        raise Exception("AI 응답이 비어있습니다")
+
+                    # HTML 응답인지 확인 (에러 페이지가 반환된 경우)
+                    if ai_result.startswith('<!DOCTYPE') or '<html' in ai_result.lower():
+                        raise Exception(f"HTML 에러 페이지가 반환되었습니다. API 키나 모델 설정을 확인해주세요. 응답 내용: {ai_result[:200]}...")
+
+                    # AI 응답 파싱 (사주 + MBTI 점수 합산 방식)
+                    lines = ai_result.split('\n')
+                    saju_score = 25  # 사주 호환성 기본값 (50점 만점의 절반)
+                    mbti_score = 25  # MBTI 호환성 기본값 (50점 만점의 절반)
+                    compatibility_score = 50  # 최종 호환성 점수 기본값
+                    matching_reason = ai_result  # 기본값으로 전체 응답 저장
+                    reason_found = False
+
+                    # 더 정확한 파싱을 위해 여러 패턴 시도
+                    for line in lines:
+                        line = line.strip()
+                        if '사주 호환성:' in line:
+                            try:
+                                score_text = line.split('사주 호환성:')[1].strip()
+                                import re
+                                score_match = re.search(r'\d+', score_text)
+                                if score_match:
+                                    saju_score = int(score_match.group())
+                                    saju_score = max(1, min(50, saju_score))
+                                    print(f"✅ 사주 호환성 파싱 성공: {saju_score}/50")
+                            except Exception as parse_error:
+                                print(f"❌ 사주 호환성 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
+                        elif 'MBTI 호환성:' in line:
+                            try:
+                                score_text = line.split('MBTI 호환성:')[1].strip()
+                                import re
+                                score_match = re.search(r'\d+', score_text)
+                                if score_match:
+                                    mbti_score = int(score_match.group())
+                                    mbti_score = max(1, min(50, mbti_score))
+                                    print(f"✅ MBTI 호환성 파싱 성공: {mbti_score}/50")
+                            except Exception as parse_error:
+                                print(f"❌ MBTI 호환성 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
+                        elif '최종 호환성 점수:' in line:
+                            try:
+                                score_text = line.split('최종 호환성 점수:')[1].strip()
+                                import re
+                                score_match = re.search(r'\d+', score_text)
+                                if score_match:
+                                    calculated_score = int(score_match.group())
+                                    calculated_score = max(1, min(100, calculated_score))
+                                    # 계산된 점수와 수동 계산 점수 비교 (일관성 검증)
+                                    manual_score = saju_score + mbti_score
+                                    if abs(calculated_score - manual_score) <= 5:  # 5점 이내 오차 허용
+                                        compatibility_score = calculated_score
+                                        print(f"✅ 최종 호환성 점수 파싱 성공: {compatibility_score} (계산값: {manual_score})")
+                                    else:
+                                        # 일관성이 없으면 수동 계산값 사용
+                                        compatibility_score = manual_score
+                                        print(f"⚠️ 점수 불일치로 수동 계산값 사용: {compatibility_score} (AI: {calculated_score})")
+                                else:
+                                    # AI가 최종 점수를 제공하지 않은 경우 수동 계산
+                                    compatibility_score = saju_score + mbti_score
+                                    print(f"✅ 수동 계산된 호환성 점수: {compatibility_score} (사주: {saju_score}, MBTI: {mbti_score})")
+                            except Exception as parse_error:
+                                print(f"❌ 최종 호환성 점수 파싱 오류 ({user1['name']} ↔ {user2['name']}): {parse_error}")
+                                # 오류 시 수동 계산으로 폴백
+                                compatibility_score = saju_score + mbti_score
+                                print(f"✅ 오류로 인한 수동 계산: {compatibility_score}")
+                        elif '매칭 이유:' in line and not reason_found:
+                            try:
+                                reason_text = line.split('매칭 이유:', 1)[1].strip()
+                                if reason_text and len(reason_text) > 3:  # 너무 짧지 않은 경우
+                                    matching_reason = reason_text[:150]  # 150자 제한
+                                    reason_found = True
+                            except:
+                                pass
+
+                    # 최종 검증 (간소화)
+                    if not matching_reason or len(matching_reason.strip()) < 5:
+                        matching_reason = f"{user1['name']}님과 {user2['name']}님은 {compatibility_score}점 호환성입니다."
+
+                    print(f"📊 결과 - 점수: {compatibility_score}, 이유: {matching_reason[:50]}...")
+
+                    # 모든 매칭 분석 결과를 저장 (중복 포함)
+                    all_pair_scores.append({
+                        'user1_id': user1['id'],
+                        'user2_id': user2['id'],
+                        'user1_name': user1['name'],
+                        'user2_name': user2['name'],
+                        'compatibility_score': compatibility_score,
+                        'matching_reason': matching_reason
+                    })
+
+                    print(f"✅ 매칭 분석 완료: {user1['name']} ↔ {user2['name']} (점수: {compatibility_score})")
+
+                except Exception as e:
+                    error_msg = f"매칭 분석 중 오류 발생 ({user1['name']} ↔ {user2['name']}): {str(e)}"
+                    print(f"❌ {error_msg}")
+
+                    # 치명적인 오류인 경우 전체 매칭을 중단
+                    if "HTML 에러 페이지" in str(e) or "API 키" in str(e):
+                        return jsonify({'error': f'AI API 호출 중 오류가 발생했습니다: {str(e)}'}), 500
+
+                    # 그 외의 오류는 이 쌍만 건너뛰고 계속 진행
+                    continue
 
         # 2. 70점 이상인 매칭만 선정 (모든 쌍에 대해 분석한 후 필터링)
         selected_matches = []
@@ -1416,59 +1303,36 @@ def perform_matching():
                 # 매칭 완료 푸시 알림 전송
                 send_matching_notification(user_id)
 
-        # 최종 실행 시간 계산
-        total_time = time.time() - matching_start_time
-        
-        # 응답 객체 구성 (JSON 직렬화 안전)
-        response_data = {
-            'success': True,
+        return jsonify({
             'message': f'매칭이 완료되었습니다. 70점 이상인 매칭 결과만 선정하여 총 {len(matches)}개의 매칭 결과를 생성했습니다.',
             'matches_count': len(matches),
-            'execution_time': round(total_time, 2),
             'matches': matches
-        }
-        
-        print(f"✅ 매칭 완료: {len(matches)}개 결과, 실행시간: {total_time:.2f}초")
-        
-        return jsonify(response_data)
-
-    except TimeoutError as e:
-        print(f"⏰ 매칭 타임아웃 발생: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': '매칭 처리 시간이 초과되었습니다',
-            'message': '처리 시간이 10분을 초과했습니다. 사용자 수를 줄여서 다시 시도해주세요.',
-            'timeout': True
-        }), 408
+        })
 
     except Exception as e:
-        # 실행 시간 계산
-        elapsed_time = time.time() - matching_start_time
+        error_details = {
+            'message': '매칭 처리 중 오류 발생',
+            'error_type': type(e).__name__,
+            'error_message': str(e),
+            'environment': 'vercel'
+        }
 
         print(f"❌ 최종 매칭 처리 중 치명적 오류 발생: {str(e)}")
         print(f"❌ 오류 타입: {type(e).__name__}")
-        print(f"❌ 실행 시간: {elapsed_time:.2f}초")
-        
         import traceback
         print(f"❌ 상세 오류: {traceback.format_exc()}")
 
-        # 오류 유형별 친화적 메시지
-        error_message = '매칭 처리 중 오류가 발생했습니다'
+        # Vercel 환경에서 발생 가능한 일반적인 오류들에 대한 친화적 메시지
         if "timeout" in str(e).lower() or "time" in str(e).lower():
-            error_message = '처리 시간이 초과되었습니다. 사용자 수를 줄여서 다시 시도해주세요.'
+            error_details['user_message'] = '처리 시간이 초과되었습니다. 사용자 수를 줄여서 다시 시도해주세요.'
         elif "quota" in str(e).lower() or "limit" in str(e).lower():
-            error_message = 'AI API 사용량 제한에 도달했습니다. 잠시 후 다시 시도해주세요.'
+            error_details['user_message'] = 'AI API 사용량 제한에 도달했습니다. 잠시 후 다시 시도해주세요.'
         elif "network" in str(e).lower() or "connection" in str(e).lower():
-            error_message = '네트워크 연결에 문제가 있습니다. 다시 시도해주세요.'
-        elif "json" in str(e).lower():
-            error_message = '데이터 처리 중 오류가 발생했습니다. 다시 시도해주세요.'
+            error_details['user_message'] = '네트워크 연결에 문제가 있습니다. 다시 시도해주세요.'
+        else:
+            error_details['user_message'] = '매칭 처리 중 오류가 발생했습니다. 관리자에게 문의해주세요.'
 
-        return jsonify({
-            'success': False,
-            'error': error_message,
-            'error_type': type(e).__name__,
-            'execution_time': round(elapsed_time, 2)
-        }), 500
+        return jsonify({'error': error_details['user_message']}), 500
 
 @app.route('/admin/matching/results')
 def get_matching_results():
@@ -1476,63 +1340,40 @@ def get_matching_results():
         return jsonify({'error': '로그인이 필요합니다'}), 401
 
     try:
-        print("🔍 매칭 결과 조회 시작")
-        
-        # Supabase에서 매칭 결과 조회 (간단한 쿼리로 변경)
-        matches_response = supabase.table('matches').select('*').order('compatibility_score', desc=True).order('created_at', desc=True).limit(100).execute()
-        
-        print(f"📊 조회된 매칭 결과: {len(matches_response.data)}개")
+        # Supabase에서 매칭 결과 조회
+        matches_response = supabase.table('matches').select('*').order('compatibility_score', desc=True).order('created_at', desc=True).execute()
+        matches_data = matches_response.data
 
         results = []
-        for match in matches_response.data:
-            try:
-                # 각 사용자 정보를 개별적으로 조회
-                user1_response = supabase.table('results').select('name, mbti, instagram_id').eq('id', match['user1_id']).execute()
-                user2_response = supabase.table('results').select('name, mbti, instagram_id').eq('id', match['user2_id']).execute()
+        for match in matches_data:
+            # 각 사용자 정보 별도 조회
+            user1_response = supabase.table('results').select('name, mbti, instagram_id').eq('id', match['user1_id']).execute()
+            user2_response = supabase.table('results').select('name, mbti, instagram_id').eq('id', match['user2_id']).execute()
 
-                user1_data = user1_response.data[0] if user1_response.data else {'name': 'Unknown', 'mbti': '', 'instagram_id': ''}
-                user2_data = user2_response.data[0] if user2_response.data else {'name': 'Unknown', 'mbti': '', 'instagram_id': ''}
+            user1_data = user1_response.data[0] if user1_response.data else {'name': 'Unknown', 'mbti': '', 'instagram_id': ''}
+            user2_data = user2_response.data[0] if user2_response.data else {'name': 'Unknown', 'mbti': '', 'instagram_id': ''}
 
-                results.append({
-                    'id': match['id'],
-                    'compatibility_score': match['compatibility_score'],
-                    'matching_reason': match['matching_reason'][:100] if match['matching_reason'] else '',
-                    'created_at': match['created_at'],
-                    'user1': {
-                        'name': user1_data.get('name', 'Unknown'),
-                        'mbti': user1_data.get('mbti', ''),
-                        'instagram': user1_data.get('instagram_id', '')
-                    },
-                    'user2': {
-                        'name': user2_data.get('name', 'Unknown'),
-                        'mbti': user2_data.get('mbti', ''),
-                        'instagram': user2_data.get('instagram_id', '')
-                    }
-                })
-            except Exception as item_error:
-                print(f"⚠️ 매칭 항목 처리 오류: {item_error}")
-                continue
+            results.append({
+                'id': match['id'],
+                'compatibility_score': match['compatibility_score'],
+                'matching_reason': match['matching_reason'],
+                'created_at': match['created_at'],
+                'user1': {
+                    'name': user1_data['name'],
+                    'mbti': user1_data['mbti'],
+                    'instagram': user1_data['instagram_id']
+                },
+                'user2': {
+                    'name': user2_data['name'],
+                    'mbti': user2_data['mbti'],
+                    'instagram': user2_data['instagram_id']
+                }
+            })
 
-        print(f"✅ 매칭 결과 처리 완료: {len(results)}개")
         return jsonify({'matches': results})
 
     except Exception as e:
-        print(f"❌ 매칭 결과 조회 오류: {e}")
-        # 간단한 대체 조회 시도
-        try:
-            matches_response = supabase.table('matches').select('*').limit(50).execute()
-            simple_results = [{
-                'id': m['id'],
-                'compatibility_score': m['compatibility_score'],
-                'matching_reason': m['matching_reason'][:50] if m['matching_reason'] else '',
-                'created_at': m['created_at'],
-                'user1': {'name': f"User {m['user1_id']}", 'mbti': '', 'instagram': ''},
-                'user2': {'name': f"User {m['user2_id']}", 'mbti': '', 'instagram': ''}
-            } for m in matches_response.data]
-            print(f"🔄 대체 조회 성공: {len(simple_results)}개")
-            return jsonify({'matches': simple_results})
-        except:
-            return jsonify({'matches': [], 'error': '매칭 결과를 불러올 수 없습니다'}), 200
+        return jsonify({'error': f'매칭 결과 조회 중 오류 발생: {e}'}), 500
 
 # --- [푸시 알림 관련 API 엔드포인트들] ---
 
@@ -1703,7 +1544,7 @@ def analyze_saju():
     try:
         data = request.get_json()
         name = data.get('name', '정보 없음')
-        student_id = data.get('studentId', '0')
+        student_id = data.get('studentId', '정보 없음')
         year = int(data['year']); month = int(data['month']); day = int(data['day']); hour = int(data['hour'])
         mbti = data.get('mbti', '정보 없음')
         instagram_id = data.get('instagramId', '')
@@ -1718,39 +1559,51 @@ def analyze_saju():
         return jsonify({"error": f"사주를 계산하는 중 오류 발생: {e}"}), 500
 
     try:
-        # 캐시 키 생성 (MBTI만 - 사주 정보는 동적으로 채움)
-        analysis_cache_key = mbti
+        # API 키 확인
+        if not GOOGLE_API_KEY:
+            return jsonify({"error": "Google AI API 키가 설정되지 않아 사주 분석을 수행할 수 없습니다. 관리자에게 문의해주세요."}), 500
 
-        # 캐시 확인 (이미 분석된 MBTI이면 즉시 반환)
-        if analysis_cache_key in saju_analysis_cache:
-            print(f"⚡ 캐시된 MBTI 분석 템플릿 사용: {name}({mbti})")
-            # 캐시된 템플릿에서 사주 정보와 이름 동적으로 채움
-            template = saju_analysis_cache[analysis_cache_key]
-            ai_response = template.replace("[이름]", name)
-            ai_response = ai_response.replace("[연주]", year_p)
-            ai_response = ai_response.replace("[월주]", month_p)
-            ai_response = ai_response.replace("[일주]", day_p)
-            ai_response = ai_response.replace("[시주]", time_p)
-        else:
-            # AI 호출 없이 즉시 생성 (템플릿 기반)
-            print(f"🤖 사주 분석 생성: {name}")
-            ai_response = f"""🔮 사주 정보
-연주(년): {year_p}, 월주(월): {month_p}, 일주(일): {day_p}, 시주(시): {time_p}
+        # AI 모델 선택 (간단하게)
+        try:
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            print("✅ Gemini 2.0 Flash 모델 사용 중")
+        except Exception as e:
+            try:
+                model = genai.GenerativeModel('gemini-1.5-pro')
+                print("✅ Gemini 1.5 Pro 모델 사용 중")
+            except Exception as e:
+                return jsonify({"error": f"AI 모델을 로드할 수 없습니다: {e}"}), 500
 
-💬 AI 분석 결과
-{name}님은 밝고 따뜻한 성격을 가지고 계시네요. MBTI {mbti} 유형답게 창의적이고 사람들과의 소통을 좋아하는 스타일입니다. 연애에서는 진심 어린 마음으로 상대방을 대하는 타입이에요.
+        prompt = f"""사주: {saju_text}, MBTI: {mbti}
+
+다음 형식으로 분석해줘:
+🔮 사주 정보: {saju_text}
+
+💬 AI 분석 결과: {mbti} 성격의 {name}님은 사주 {saju_text}의 기운을 가지고 있어요.
 
 🤝 추천 매칭 상대
-* 사주: {year_p}의 기운과 잘 어울리는 사주를 가진 분
-* MBTI: {mbti}와 잘 맞는 유형들
+* 사주: {year_p} 기운과 조화로운 사주
+* MBTI: {mbti}와 잘 맞는 유형
 
-행복한 연애 하시길 바래요! 💕"""
+행복한 연애 되세요!"""
 
-            # 캐시에 저장 및 파일에 저장
-            saju_analysis_cache[analysis_cache_key] = ai_response
-            print(f"💾 캐시 메모리 저장 완료 (크기: {len(saju_analysis_cache)})")
-            save_saju_cache(saju_analysis_cache)
-            print(f"💾 사주 분석 결과 파일에 저장: {name} (키: {analysis_cache_key})")
+        response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(
+            temperature=0.7,
+            max_output_tokens=150,  # 더 짧게 제한
+        ))
+
+        # 응답 검증
+        if response is None:
+            raise Exception("AI 응답이 None입니다")
+
+        ai_response = response.text.strip() if response.text else ""
+
+        if not ai_response:
+            raise Exception("AI 응답이 비어있습니다")
+
+        # HTML 응답인지 확인 (에러 페이지가 반환된 경우)
+        if ai_response.startswith('<!DOCTYPE') or '<html' in ai_response.lower():
+            raise Exception("AI API에서 HTML 에러 페이지가 반환되었습니다. 잠시 후 다시 시도해주세요.")
 
         # 학번 중복 체크 및 데이터 저장
         try:
@@ -1856,7 +1709,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"❌ Supabase 연결 실패: {e}")
 
-    # 매칭 중단 방지: 자동 재시작 비활성화
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
 

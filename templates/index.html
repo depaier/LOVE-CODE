@@ -3,11 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LOVE-CODE</title>
+    <meta name="theme-color" content="#ff69b4" />
+    <meta name="description" content="AI 기반 사주 궁합 매칭 서비스" />
+    <link rel="manifest" href="/static/manifest.json" />
+    <!-- Favicon -->
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/static/img/LOVECODE_ICON.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="/static/img/LOVECODE_ICON.png"
+    />
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="/static/img/LOVECODE_ICON.png" />
+    <title>LOVE-CODE - 사주 궁합 매칭</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=swap"
+      href="https://fonts.googleapis.com/css2?family=BM+Hanna+Pro&display=swap"
       rel="stylesheet"
     />
 
@@ -32,8 +50,8 @@
       }
 
       body {
-        /* 2. font-family를 'Nanum Brush Script'로 변경 */
-        font-family: "Nanum Brush Script", cursive;
+        /* 2. font-family를 'BM Hanna Pro'로 변경 */
+        font-family: "BM Hanna Pro", cursive;
         background-color: #fdfaf3;
         background-size: cover; /* 이미지가 화면 전체를 덮도록 설정 */
         background-position: center;
@@ -82,7 +100,7 @@
         background-color: transparent;
         font-size: 1.5em; /* 폰트에 맞게 크기 살짝 조정 */
         /* 2. 입력창 폰트도 변경 */
-        font-family: "Nanum Brush Script", cursive;
+        font-family: "BM Hanna Pro", cursive;
         transition: border-color 0.3s;
       }
       input:focus {
@@ -105,7 +123,7 @@
         border-radius: 4px;
         font-size: 1.8em; /* 폰트에 맞게 크기 살짝 조정 */
         /* 2. 버튼 폰트도 변경 */
-        font-family: "Nanum Brush Script", cursive;
+        font-family: "BM Hanna Pro", cursive;
         cursor: pointer;
         transition: background-color 0.3s;
       }
@@ -127,7 +145,9 @@
         color: #5a3a22;
         position: relative;
         padding-left: 35px;
-        line-height: 1.4;
+        line-height: 0.8;
+        min-height: 24px;
+        height: 34px;
       }
 
       .checkbox-label input[type="checkbox"] {
@@ -140,8 +160,9 @@
 
       .checkmark {
         position: absolute;
-        top: 2px;
+        top: 50%;
         left: 0;
+        transform: translateY(-50%);
         height: 20px;
         width: 20px;
         background-color: #ffffff;
@@ -159,13 +180,14 @@
         content: "";
         position: absolute;
         display: none;
-        left: 6px;
-        top: 2px;
+        left: 50%;
+        top: 50%;
         width: 6px;
         height: 10px;
         border: solid white;
         border-width: 0 2px 2px 0;
-        transform: rotate(45deg);
+        transform: translate(-50%, -60%) rotate(45deg);
+        transform-origin: center;
       }
 
       .checkbox-label input[type="checkbox"]:checked ~ .checkmark:after {
@@ -193,12 +215,14 @@
         margin-left: 2px;
       }
 
-      /* 테스트 버튼 스타일 */
+      /* 테스트 버튼 스타일 주석처리 */
+      /*
       #test-modal-btn:hover {
         background-color: #555 !important;
         transform: translateY(-1px);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
       }
+      */
       /* 모달 관련 스타일 */
       .modal {
         display: none;
@@ -287,10 +311,11 @@
       /* 모바일 반응형 스타일 */
       @media (max-width: 768px) {
         .modal-content {
-          margin: 2% auto;
+          margin: 1% auto;
           padding: 15px;
-          width: calc(100% - 10px);
-          max-height: 90vh;
+          width: calc(100vw - 40px);
+          max-width: 550px;
+          max-height: 95vh;
         }
         .close {
           top: 8px;
@@ -310,46 +335,60 @@
 
       @media (max-width: 480px) {
         .modal-content {
-          margin: 1% auto;
-          padding: 10px;
-          width: calc(100% - 5px);
-          border-radius: 4px;
+          margin: 0.5% auto;
+          padding: 12px;
+          width: calc(100vw - 32px);
+          max-width: 400px;
+          max-height: 96vh;
+          border-radius: 6px;
         }
         .close {
           top: 5px;
           right: 8px;
           font-size: 2em;
-          width: 50px;
-          height: 50px;
+          width: 48px;
+          height: 48px;
           border: 2px solid #8a6d59;
           background: rgba(255, 255, 255, 0.95);
         }
         #result-text {
           font-size: 1.1em;
           margin-top: 15px;
+          line-height: 1.6;
         }
         .loading-message {
           font-size: 1em;
           margin: 15px 0;
         }
         .checkbox-label {
-          font-size: 1.1em;
+          font-size: 1em;
           padding-left: 30px;
+          min-height: 20px;
         }
         .checkmark {
           height: 18px;
           width: 18px;
         }
         .checkmark:after {
-          left: 5px;
-          top: 1px;
+          left: 50%;
+          top: 50%;
           width: 5px;
           height: 9px;
+          transform: translate(-50%, -60%) rotate(45deg);
+          transform-origin: center;
         }
       }
 
       /* 작은 모바일 기기 (320px 이하) */
       @media (max-width: 320px) {
+        .modal-content {
+          margin: 0.3% auto;
+          padding: 10px;
+          width: calc(100vw - 24px);
+          max-width: 280px;
+          max-height: 97vh;
+          border-radius: 4px;
+        }
         .close {
           top: 3px;
           right: 5px;
@@ -360,29 +399,41 @@
           border: 3px solid #8a6d59;
           box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
         }
-        .modal-content {
-          margin: 0.5% auto;
-          padding: 8px;
-          width: calc(100% - 3px);
+        #result-text {
+          font-size: 1em;
+          margin-top: 12px;
+          line-height: 1.5;
+        }
+        .loading-message {
+          font-size: 0.95em;
+          margin: 12px 0;
         }
         .checkbox-label {
-          font-size: 1em;
+          font-size: 0.9em;
           padding-left: 28px;
+          min-height: 18px;
         }
         .checkmark {
           height: 16px;
           width: 16px;
         }
         .checkmark:after {
-          left: 4px;
-          top: 1px;
+          left: 50%;
+          top: 50%;
           width: 4px;
           height: 7px;
+          transform: translate(-50%, -60%) rotate(45deg);
+          transform-origin: center;
         }
       }
 
       /* 터치 디바이스 최적화 */
       @media (hover: none) and (pointer: coarse) {
+        .modal-content {
+          width: calc(100vw - 28px);
+          max-width: 450px;
+          max-height: 95vh;
+        }
         .close {
           width: 48px;
           height: 48px;
@@ -394,13 +445,23 @@
           transform: scale(0.95);
           background: rgba(168, 68, 72, 0.15);
         }
+        #result-text {
+          line-height: 1.6;
+          -webkit-touch-callout: none;
+          -webkit-user-select: none;
+          -khtml-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          user-select: none;
+        }
         .checkmark {
           height: 24px;
           width: 24px;
         }
         .checkbox-label {
           padding-left: 32px;
-          min-height: 24px;
+          min-height: 26px;
+          font-size: 0.85em;
         }
       }
     </style>
@@ -409,7 +470,7 @@
     <div class="container">
       <h1>LOVE-CODE</h1>
 
-      <!-- 테스트 버튼 -->
+      <!-- 테스트 버튼 주석처리
       <div style="text-align: center; margin-bottom: 20px">
         <button
           type="button"
@@ -421,7 +482,7 @@
             border-radius: 6px;
             padding: 10px 20px;
             font-size: 1em;
-            font-family: 'Nanum Brush Script', cursive;
+            font-family: 'BM Hanna Pro', cursive;
             cursor: pointer;
             transition: all 0.3s;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -430,17 +491,62 @@
           🎯 테스트 모달 보기
         </button>
       </div>
+      -->
+
+      <!-- 푸시 알림 설정 버튼 -->
+      <div style="text-align: center; margin-bottom: 30px">
+        <button
+          type="button"
+          id="push-settings-btn"
+          style="
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 25px;
+            font-size: 1.2em;
+            font-family: 'BM Hanna Pro', cursive;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+          "
+        >
+          🔔 푸시 알림 설정
+        </button>
+        <div
+          id="push-status"
+          style="margin-top: 10px; font-size: 0.9em; color: #666"
+        ></div>
+        <div id="home-screen-prompt" style="display: none; margin-top: 10px">
+          <small class="text-muted d-block">
+            📱 iOS Safari에서 푸시 알림을 사용하려면 공유 - 홈 화면에 추가
+            해주세요
+          </small>
+        </div>
+      </div>
 
       <form id="saju-form">
         <div class="form-group">
           <label for="name">이름</label
-          ><input type="text" id="name" required placeholder="예: 홍길동" />
+          ><input
+            type="text"
+            id="name"
+            inputmode="korean"
+            lang="ko"
+            autocorrect="off"
+            autocapitalize="off"
+            autocomplete="name"
+            required
+            placeholder="예: 홍길동"
+          />
         </div>
         <div class="form-group">
           <label for="studentId">학번</label
           ><input
             type="number"
             id="studentId"
+            inputmode="numeric"
+            pattern="[0-9]*"
             required
             placeholder="예: 20240001"
           />
@@ -454,13 +560,25 @@
           ><input
             type="number"
             id="hour"
+            inputmode="numeric"
+            pattern="[0-9]*"
             required
             placeholder="0~23 사이 숫자"
           />
         </div>
         <div class="form-group">
           <label for="mbti">MBTI</label
-          ><input type="text" id="mbti" required placeholder="예: ENFP" />
+          ><input
+            type="text"
+            id="mbti"
+            required
+            placeholder="예: ENFP"
+            maxlength="4"
+            pattern="[A-Z]{4}"
+            inputmode="latin"
+            style="text-transform: uppercase; ime-mode: disabled"
+            oninput="this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '').substring(0, 4)"
+          />
         </div>
         <div class="form-group">
           <label for="gender">성별</label>
@@ -475,7 +593,7 @@
               border-radius: 0;
               background-color: transparent;
               font-size: 1.5em;
-              font-family: 'Nanum Brush Script', cursive;
+              font-family: 'BM Hanna Pro', cursive;
               transition: border-color 0.3s;
               color: #3a3a3a;
             "
@@ -488,13 +606,17 @@
         <div class="form-group">
           <label for="instagramId"
             >인스타그램 아이디
-            <span style="color: #a84448; font-weight: bold">*</span></label
-          >
+            <!-- <span style="color: #a84448; font-weight: bold">*</span> -->
+          </label>
           <input
             type="text"
             id="instagramId"
+            inputmode="latin"
+            style="ime-mode: disabled"
             required
-            placeholder="예: @my_instagram"
+            placeholder="예: my_instagram"
+            oninput="this.value = this.value.replace(/[ㄱ-ㅎ|ㅏ-ㅣ|가-힣]/g, '')"
+            autocapitalize="off"
           />
         </div>
 
@@ -534,12 +656,15 @@
     </div>
     <script>
       const sajuForm = document.getElementById("saju-form");
-      const testBtn = document.getElementById("test-modal-btn");
+      // const testBtn = document.getElementById("test-modal-btn"); // 테스트 버튼 주석처리
       const modal = document.getElementById("result-modal");
       const loader = document.getElementById("loader");
       const resultText = document.getElementById("result-text");
       const loadingMessage = document.getElementById("loading-message");
       const closeBtn = document.getElementsByClassName("close")[0];
+
+      // 로딩 상태 추적 변수
+      let isLoading = false;
 
       // 모달창 열기 함수
       function openModal() {
@@ -555,18 +680,22 @@
         resultText.classList.remove("visible");
         loadingMessage.classList.remove("visible");
         loader.style.display = "none";
+        isLoading = false; // 로딩 상태 초기화
       }
 
-      // 테스트 모달 열기 함수
+      // 테스트 모달 열기 함수 주석처리
+      /*
       function openTestModal() {
         openModal();
         showResult(
           "🎯 테스트 모달입니다!\n\n이 모달창은 실제 사주 분석 없이\nUI/UX를 테스트하기 위한 용도입니다.\n\n닫기 버튼과 ESC 키로 닫을 수 있습니다."
         );
       }
+      */
 
       // 로딩 상태 표시 함수
       function showLoading() {
+        isLoading = true; // 로딩 시작
         loadingMessage.classList.add("visible");
         loader.style.display = "block";
         resultText.classList.remove("visible");
@@ -574,26 +703,36 @@
 
       // 로딩 완료 후 결과 표시 함수
       function showResult(result) {
+        isLoading = false; // 로딩 완료
         loadingMessage.classList.remove("visible");
         loader.style.display = "none";
         resultText.textContent = result;
         resultText.classList.add("visible");
       }
 
-      // 테스트 버튼 클릭 이벤트
+      // 테스트 버튼 클릭 이벤트 주석처리
+      /*
       testBtn.onclick = function () {
         openTestModal();
       };
+      */
 
       // 닫기 버튼 클릭 이벤트 (모바일 터치 지원)
       closeBtn.onclick = function () {
-        closeModal();
+        // 로딩 중에는 닫기 버튼도 비활성화
+        if (!isLoading) {
+          closeModal();
+        }
       };
 
       // 모바일 터치 이벤트 지원
       closeBtn.addEventListener(
         "touchstart",
         function (e) {
+          // 로딩 중에는 터치 이벤트도 무시
+          if (isLoading) {
+            return;
+          }
           e.preventDefault();
           closeModal();
         },
@@ -602,6 +741,10 @@
 
       // 모달 외부 클릭 시 닫기 (터치 지원)
       function handleModalClose(event) {
+        // 로딩 중에는 모달 바깥 클릭으로 닫을 수 없음
+        if (isLoading) {
+          return;
+        }
         if (event.target == modal) {
           closeModal();
         }
@@ -612,10 +755,362 @@
 
       // ESC 키로 모달 닫기
       document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape" && modal.style.display === "block") {
+        // 로딩 중에는 ESC 키로도 모달을 닫을 수 없음
+        if (
+          event.key === "Escape" &&
+          modal.style.display === "block" &&
+          !isLoading
+        ) {
           closeModal();
         }
       });
+
+      // 푸시 알림 관리 클래스
+      class PushNotificationManager {
+        constructor() {
+          this.deviceToken = localStorage.getItem("deviceToken");
+          this.userId = null;
+          this.registration = null;
+          this.vapidPublicKey = null;
+          this.init();
+          this.updateStatusDisplay();
+        }
+
+        async init() {
+          // Service Worker 지원 확인
+          if ("serviceWorker" in navigator && "PushManager" in window) {
+            try {
+              // Service Worker 등록
+              this.registration = await navigator.serviceWorker.register(
+                "/static/js/sw.js"
+              );
+              console.log("Service Worker 등록 성공");
+
+              // VAPID 퍼블릭 키 가져오기
+              await this.loadVapidPublicKey();
+
+              // 기존 디바이스 토큰이 없으면 생성
+              if (!this.deviceToken) {
+                await this.createDeviceToken();
+              }
+            } catch (error) {
+              console.error("푸시 알림 초기화 실패:", error);
+            }
+          }
+
+          this.updateStatusDisplay();
+        }
+
+        updateStatusDisplay() {
+          const statusEl = document.getElementById("push-status");
+          const homeScreenPrompt =
+            document.getElementById("home-screen-prompt");
+          if (!statusEl) return;
+
+          let status = "준비 중...";
+          let color = "#666";
+
+          // iOS Safari 감지
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          const isSafari = /^((?!chrome|android).)*safari/i.test(
+            navigator.userAgent
+          );
+
+          // PWA 모드 확인 (Home Screen에서 실행 중인지)
+          const isPWA = window.navigator.standalone === true;
+
+          // Home Screen 프롬프트 표시 여부
+          if (homeScreenPrompt) {
+            homeScreenPrompt.style.display =
+              !isPWA && isIOS && isSafari ? "block" : "none";
+          }
+
+          if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+            if (isIOS && isSafari) {
+              if (isPWA) {
+                status = "✅ PWA 모드에서 실행 중입니다.";
+                color = "#28a745";
+              } else {
+                status =
+                  "⚠️ iOS Safari에서는 iOS 16.4 이상에서 푸시 알림을 지원합니다.";
+                color = "#ffc107";
+              }
+            } else {
+              status = "❌ 이 브라우저는 푸시 알림을 지원하지 않습니다.";
+              color = "#dc3545";
+            }
+          } else if (
+            location.protocol !== "https:" &&
+            location.hostname !== "localhost"
+          ) {
+            status = "⚠️ HTTPS 연결이 필요합니다 (또는 localhost에서만 작동).";
+            color = "#ffc107";
+          } else if (!isPWA && isIOS && isSafari) {
+            status =
+              "📱 먼저 '홈 화면에 추가'를 해야 푸시 알림을 사용할 수 있습니다.";
+            color = "#ff6b35";
+          } else if (Notification.permission === "granted") {
+            status = "✅ 푸시 알림 권한이 허용되었습니다.";
+            color = "#28a745";
+          } else if (Notification.permission === "denied") {
+            status = "❌ 푸시 알림 권한이 차단되었습니다.";
+            color = "#dc3545";
+          } else {
+            if (isIOS && isSafari) {
+              status =
+                "🔔 iOS Safari에서 푸시 알림을 설정하려면 버튼을 클릭하세요.";
+            } else {
+              status = "🔔 푸시 알림 권한을 설정하려면 버튼을 클릭하세요.";
+            }
+            color = "#007bff";
+          }
+
+          statusEl.innerHTML = status;
+          statusEl.style.color = color;
+        }
+
+        // Home Screen 추가 안내 함수
+        showAddToHomeScreen() {
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          const isSafari = /^((?!chrome|android).)*safari/i.test(
+            navigator.userAgent
+          );
+
+          if (isIOS && isSafari) {
+            alert(`📱 iOS Safari에서 홈 화면에 추가하는 방법:
+
+1. Safari 브라우저 하단의 공유 버튼(□)을 탭하세요
+2. "홈 화면에 추가"를 선택하세요
+3. "추가" 버튼을 눌러 홈 화면에 추가하세요
+
+추가 후 홈 화면에서 앱을 실행하면 푸시 알림을 사용할 수 있습니다!`);
+          } else {
+            alert("이 기능은 iOS Safari에서만 필요합니다.");
+          }
+        }
+
+        // andreinwald 예제처럼 VAPID 공개 키를 직접 설정
+        async loadVapidPublicKey() {
+          // 환경변수나 설정에서 가져온 VAPID 공개 키
+          this.vapidPublicKey =
+            "BHfpLCcwKDVg2TkshpmVn9Tr3nizK-dxkCAkAIIkp59UBXRU3Iwim8FuSCXoQOLUYjPxO6GJPncPup_bBpK7z-w";
+          console.log("VAPID 공개 키 설정됨:", this.vapidPublicKey);
+        }
+
+        async createDeviceToken() {
+          try {
+            const response = await fetch("/api/user/device-token", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            });
+            const data = await response.json();
+            this.deviceToken = data.device_token;
+            localStorage.setItem("deviceToken", this.deviceToken);
+            console.log("디바이스 토큰 생성:", this.deviceToken);
+          } catch (error) {
+            console.error("디바이스 토큰 생성 실패:", error);
+          }
+        }
+
+        async requestNotificationPermission() {
+          // iOS Safari 감지
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          const isSafari = /^((?!chrome|android).)*safari/i.test(
+            navigator.userAgent
+          );
+
+          if (!("Notification" in window)) {
+            if (isIOS && isSafari) {
+              alert(
+                "iOS Safari에서는 iOS 16.4 이상에서 푸시 알림을 지원합니다."
+              );
+            } else {
+              alert("이 브라우저는 푸시 알림을 지원하지 않습니다.");
+            }
+            this.updateStatusDisplay();
+            return false;
+          }
+
+          // HTTPS 또는 localhost 확인
+          if (
+            location.protocol !== "https:" &&
+            location.hostname !== "localhost"
+          ) {
+            alert(
+              "푸시 알림은 HTTPS 연결에서만 작동합니다.\n(또는 localhost에서 테스트 가능)"
+            );
+            this.updateStatusDisplay();
+            return false;
+          }
+
+          try {
+            const permission = await Notification.requestPermission();
+            this.updateStatusDisplay();
+
+            if (permission === "granted") {
+              if (isIOS && isSafari) {
+                console.log("iOS Safari에서 푸시 알림 권한이 허용되었습니다.");
+              }
+            } else if (permission === "denied") {
+              if (isIOS && isSafari) {
+                // 권한 거부 시 홈화면 추가 안내 alert로 변경
+                alert(
+                  "📱 iOS Safari에서 푸시 알림을 사용하려면 먼저 홈 화면에 추가해주세요.\n\nSafari 하단 공유 버튼(□) → 홈 화면에 추가"
+                );
+              }
+            }
+
+            return permission === "granted";
+          } catch (error) {
+            console.error("알림 권한 요청 실패:", error);
+            this.updateStatusDisplay();
+            return false;
+          }
+        }
+
+        async subscribeToPush() {
+          if (!this.registration || !this.vapidPublicKey) {
+            console.error("푸시 구독을 위한 준비가 되지 않았습니다.");
+            return false;
+          }
+
+          try {
+            const subscription = await this.registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: this.urlBase64ToUint8Array(
+                this.vapidPublicKey
+              ),
+            });
+
+            // 서버에 구독 정보 전송
+            const response = await fetch("/api/push/subscribe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                device_token: this.deviceToken,
+                subscription: {
+                  endpoint: subscription.endpoint,
+                  keys: {
+                    p256dh: this.arrayBufferToBase64(
+                      subscription.getKey("p256dh")
+                    ),
+                    auth: this.arrayBufferToBase64(subscription.getKey("auth")),
+                  },
+                },
+                user_id: this.userId, // 사주 분석 완료 후 연결
+              }),
+            });
+
+            if (response.ok) {
+              console.log("푸시 알림 구독 성공");
+              return true;
+            } else {
+              console.error("푸시 구독 서버 등록 실패");
+              return false;
+            }
+          } catch (error) {
+            console.error("푸시 구독 실패:", error);
+            return false;
+          }
+        }
+
+        async linkDeviceToUser(userId) {
+          this.userId = userId;
+          try {
+            const response = await fetch("/api/user/link-device", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                device_token: this.deviceToken,
+                user_id: userId,
+              }),
+            });
+
+            if (response.ok) {
+              console.log("디바이스가 사용자 계정에 연결되었습니다.");
+            } else {
+              console.error("디바이스 연결 실패");
+            }
+          } catch (error) {
+            console.error("디바이스 연결 중 오류:", error);
+          }
+        }
+
+        urlBase64ToUint8Array(base64String) {
+          const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+          const base64 = (base64String + padding)
+            .replace(/-/g, "+")
+            .replace(/_/g, "/");
+
+          const rawData = window.atob(base64);
+          const outputArray = new Uint8Array(rawData.length);
+
+          for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+          }
+          return outputArray;
+        }
+
+        arrayBufferToBase64(buffer) {
+          const bytes = new Uint8Array(buffer);
+          let binary = "";
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          return window.btoa(binary);
+        }
+      }
+
+      // 푸시 알림 관리자 인스턴스 생성
+      const pushManager = new PushNotificationManager();
+
+      // 푸시 설정 버튼 이벤트
+      document
+        .getElementById("push-settings-btn")
+        .addEventListener("click", async () => {
+          const button = document.getElementById("push-settings-btn");
+          button.disabled = true;
+          button.innerHTML = "⏳ 설정 중...";
+
+          // iOS Safari 감지
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          const isSafari = /^((?!chrome|android).)*safari/i.test(
+            navigator.userAgent
+          );
+
+          try {
+            const permissionGranted =
+              await pushManager.requestNotificationPermission();
+
+            if (permissionGranted) {
+              const subscribed = await pushManager.subscribeToPush();
+              if (subscribed) {
+                if (isIOS && isSafari) {
+                  alert(
+                    "✅ iOS Safari에서 푸시 알림이 설정되었습니다!\n\n📱 테스트 방법:\n1. Safari를 백그라운드로 전환 (홈 버튼)\n2. 잠시 기다렸다가 관리자가 매칭을 실행\n3. 알림이 도착하면 탭하여 확인\n\n💡 알림이 안 오면 Safari 설정을 확인해주세요."
+                  );
+                } else {
+                  alert(
+                    "✅ 푸시 알림이 성공적으로 설정되었습니다!\n매칭이 완료되면 알림을 보내드립니다."
+                  );
+                }
+              } else {
+                alert(
+                  "푸시 알림 구독에 실패했습니다.\n잠시 후 다시 시도해주세요."
+                );
+              }
+            } else {
+              // requestNotificationPermission()에서 이미 alert 표시했으므로 여기서는 표시하지 않음
+              console.log("푸시 알림 권한이 거부되었습니다.");
+            }
+          } catch (error) {
+            console.error("푸시 설정 실패:", error);
+            alert("푸시 알림 설정 중 오류가 발생했습니다.");
+          } finally {
+            button.disabled = false;
+            button.innerHTML = "🔔 푸시 알림 설정";
+          }
+        });
 
       sajuForm.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -636,9 +1131,11 @@
           return;
         }
 
-        // 인스타그램 아이디 형식 검사 (@로 시작하는지 확인)
-        if (!instagramId.startsWith("@")) {
-          alert("인스타그램 아이디는 @로 시작해야 합니다.\n예: @my_instagram");
+        // 인스타그램 아이디 형식 검사 (@ 없이 입력해야 함)
+        if (instagramId.startsWith("@")) {
+          alert(
+            "인스타그램 아이디 앞에 @를 붙이지 말고 입력해주세요.\n예: my_instagram"
+          );
           document.getElementById("instagramId").focus();
           return;
         }
@@ -664,7 +1161,7 @@
           month: birthDateObj.getMonth() + 1, // getMonth()는 0부터 시작하므로 +1
           day: birthDateObj.getDate(),
           hour: parseInt(document.getElementById("hour").value),
-          mbti: document.getElementById("mbti").value,
+          mbti: document.getElementById("mbti").value.toUpperCase(),
           gender: document.getElementById("gender").value,
           instagramId: document.getElementById("instagramId").value,
         };
@@ -678,6 +1175,11 @@
           const result = await response.json();
           if (response.ok) {
             showResult(result.ai_analysis);
+
+            // 사용자 ID가 있으면 디바이스 연결
+            if (result.user_id) {
+              await pushManager.linkDeviceToUser(result.user_id);
+            }
           } else {
             showResult("오류가 발생했습니다: " + result.error);
           }

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🎉 매칭 결과 | LOVE-CODE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=BM+Hanna+Pro&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes heartbeat {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+      }
+
+      body {
+        font-family: "BM Hanna Pro", cursive;
+        background-color: #fdfaf3;
+        color: #3a3a3a;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        animation: fadeIn 0.8s ease-out;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 40px;
+        padding: 30px;
+        background-color: #ffffff;
+        border: 3px solid #8a6d59;
+        border-radius: 4px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+      }
+
+      .header h1 {
+        font-size: 3em;
+        color: #5a3a22;
+        margin-bottom: 15px;
+      }
+
+      .header .subtitle {
+        font-size: 1.5em;
+        color: #8a6d59;
+        margin-bottom: 10px;
+      }
+
+      .match-count {
+        font-size: 1.2em;
+        color: #a84448;
+        font-weight: bold;
+      }
+
+      .match-card {
+        background-color: #ffffff;
+        border: 3px solid #8a6d59;
+        border-radius: 4px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        margin-bottom: 25px;
+        padding: 30px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .match-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+      }
+
+      .match-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 15px;
+      }
+
+      .match-info {
+        flex: 1;
+        min-width: 200px;
+      }
+
+      .match-name {
+        font-size: 2em;
+        color: #5a3a22;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .heart-icon {
+        color: #a84448;
+        animation: heartbeat 1.5s infinite;
+      }
+
+      .mbti-badge {
+        background-color: #a84448;
+        color: #fdfaf3;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 1.2em;
+        font-weight: bold;
+        display: inline-block;
+        margin-bottom: 10px;
+      }
+
+      .compatibility-score {
+        font-size: 2.5em;
+        font-weight: bold;
+        color: #a84448;
+        text-align: center;
+        min-width: 120px;
+      }
+
+      .score-label {
+        font-size: 1em;
+        color: #8a6d59;
+        text-align: center;
+      }
+
+      .matching-reason {
+        background-color: #fdfaf3;
+        border: 2px solid #bda08c;
+        border-radius: 4px;
+        padding: 20px;
+        margin-top: 20px;
+        line-height: 1.6;
+        font-size: 1.3em;
+        color: #5a3a22;
+      }
+
+      .instagram-section {
+        text-align: center;
+        margin-top: 20px;
+      }
+
+      .instagram-btn {
+        background-color: #a84448;
+        color: #fdfaf3;
+        border: none;
+        border-radius: 4px;
+        padding: 12px 25px;
+        font-size: 1.3em;
+        font-family: "BM Hanna Pro", cursive;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+      }
+
+      .instagram-btn:hover {
+        background-color: #8c383b;
+        transform: translateY(-2px);
+        color: #fdfaf3;
+        text-decoration: none;
+      }
+
+      .instagram-disabled {
+        background-color: #bda08c;
+        color: #ffffff;
+        cursor: not-allowed;
+        opacity: 0.7;
+      }
+
+      .instagram-disabled:hover {
+        background-color: #bda08c;
+        transform: none;
+      }
+
+      .footer-buttons {
+        text-align: center;
+        margin-top: 40px;
+        padding: 30px;
+        background-color: #ffffff;
+        border: 3px solid #8a6d59;
+        border-radius: 4px;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+      }
+
+      .footer-buttons .btn {
+        background-color: #a84448;
+        color: #fdfaf3;
+        border: none;
+        border-radius: 4px;
+        padding: 12px 25px;
+        font-size: 1.3em;
+        font-family: "BM Hanna Pro", cursive;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        margin: 0 10px;
+        transition: background-color 0.3s ease;
+      }
+
+      .footer-buttons .btn:hover {
+        background-color: #8c383b;
+        color: #fdfaf3;
+        text-decoration: none;
+      }
+
+      .footer-buttons .btn-outline {
+        background-color: transparent;
+        color: #a84448;
+        border: 2px solid #a84448;
+      }
+
+      .footer-buttons .btn-outline:hover {
+        background-color: #a84448;
+        color: #fdfaf3;
+      }
+
+      /* 모바일 반응형 */
+      @media (max-width: 768px) {
+        .header h1 {
+          font-size: 2.5em;
+        }
+
+        .header .subtitle {
+          font-size: 1.3em;
+        }
+
+        .match-header {
+          flex-direction: column;
+          text-align: center;
+        }
+
+        .match-name {
+          font-size: 1.8em;
+          justify-content: center;
+        }
+
+        .compatibility-score {
+          font-size: 2em;
+        }
+
+        .matching-reason {
+          font-size: 1.2em;
+        }
+
+        .footer-buttons .btn {
+          display: block;
+          margin: 10px 0;
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .container {
+          padding: 10px;
+        }
+
+        .header {
+          padding: 20px;
+        }
+
+        .header h1 {
+          font-size: 2em;
+        }
+
+        .match-card {
+          padding: 20px;
+        }
+
+        .match-name {
+          font-size: 1.5em;
+        }
+
+        .matching-reason {
+          font-size: 1.1em;
+          padding: 15px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- 헤더 섹션 -->
+      <div class="header">
+        <h1>🎉 천생연분 찾기 완료! 🎉</h1>
+        <div class="subtitle">LOVE-CODE 사주 매칭 결과</div>
+        <div class="match-count">
+          총 {{ matches|length }}명의 매칭 상대를 찾았습니다
+        </div>
+      </div>
+
+      <!-- 매칭 결과 카드들 -->
+      {% for match in matches %}
+      <div class="match-card">
+        <div class="match-header">
+          <div class="match-info">
+            <div class="match-name">
+              <span class="heart-icon">💕</span>
+              {{ match.name }}
+            </div>
+            <div class="mbti-badge">{{ match.mbti }}</div>
+          </div>
+          <div>
+            <div class="compatibility-score">
+              {{ match.compatibility_score }}점
+            </div>
+            <div class="score-label">사주 궁합</div>
+          </div>
+        </div>
+
+        <div class="instagram-section">
+          {% if match.instagram_id %}
+          <a
+            href="https://instagram.com/{{ match.instagram_id }}"
+            target="_blank"
+            class="instagram-btn"
+          >
+            📷 인스타그램 보기
+          </a>
+          {% else %}
+          <span class="instagram-btn instagram-disabled">
+            📷 인스타그램 미등록
+          </span>
+          {% endif %}
+        </div>
+
+        <div class="matching-reason">
+          <strong>🔮 사주 전문가의 매칭 분석:</strong><br />
+          {{ match.matching_reason }}
+        </div>
+      </div>
+      {% endfor %}
+
+      <!-- 하단 버튼들 -->
+      <div class="footer-buttons">
+        <a href="/" class="btn"> 🏠 홈으로 돌아가기 </a>
+        <a href="/push-settings" class="btn btn-outline"> 🔔 알림 설정 </a>
+      </div>
+    </div>
+
+    <!-- 매칭 결과 확인 알림 -->
+    <script>
+      // URL에서 notification 파라미터 확인
+      const urlParams = new URLSearchParams(window.location.search);
+      const fromNotification = urlParams.get("notification");
+
+      if (fromNotification === "match_complete") {
+        // 알림에서 왔음을 표시하는 메시지
+        showNotification("🎉 매칭 결과를 확인했습니다!", "success");
+      }
+
+      function showNotification(message, type = "info") {
+        // 간단한 알림 박스 생성
+        const notification = document.createElement("div");
+        notification.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background-color: ${type === "success" ? "#a84448" : "#8a6d59"};
+          color: #fdfaf3;
+          padding: 15px 20px;
+          border-radius: 4px;
+          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+          z-index: 9999;
+          font-family: "BM Hanna Pro", cursive;
+          font-size: 1.1em;
+          max-width: 300px;
+          animation: slideIn 0.3s ease-out;
+        `;
+        notification.innerHTML = message;
+
+        // 애니메이션 추가
+        const style = document.createElement("style");
+        style.textContent = `
+          @keyframes slideIn {
+            from {
+              transform: translateX(100%);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
+              opacity: 1;
+            }
+          }
+        `;
+        document.head.appendChild(style);
+
+        document.body.appendChild(notification);
+
+        // 3초 후 자동 제거
+        setTimeout(() => {
+          notification.style.animation = "slideIn 0.3s ease-out reverse";
+          setTimeout(() => {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 300);
+        }, 3000);
+      }
+
+      // 페이지 로드 완료 후 부드러운 나타나기 효과
+      document.addEventListener("DOMContentLoaded", function () {
+        const cards = document.querySelectorAll(".match-card");
+        cards.forEach((card, index) => {
+          card.style.opacity = "0";
+          card.style.transform = "translateY(20px)";
+          setTimeout(() => {
+            card.style.transition =
+              "opacity 0.5s ease-out, transform 0.5s ease-out";
+            card.style.opacity = "1";
+            card.style.transform = "translateY(0)";
+          }, index * 100);
+        });
+      });
+    </script>
+  </body>
+</html>
