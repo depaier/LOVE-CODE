@@ -1,6 +1,6 @@
 // Service Worker for Push Notifications
 // 사주 매칭 서비스 푸시 알림용 Service Worker
-// Version: 2024-09-29-v2
+// Version: 2024-09-29-v3
 
 // Service Worker 설치 이벤트
 self.addEventListener("install", (event) => {
@@ -11,20 +11,23 @@ self.addEventListener("install", (event) => {
 
 // Service Worker 활성화 이벤트
 self.addEventListener("activate", (event) => {
-  console.log("Service Worker 활성화됨 - Version: 2024-09-29-v2");
+  console.log("Service Worker 활성화됨 - Version: 2024-09-29-v3");
   // 기존 캐시 정리 및 즉시 제어권 획득
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          console.log("기존 캐시 삭제:", cacheName);
-          return caches.delete(cacheName);
-        })
-      );
-    }).then(() => {
-      console.log("모든 클라이언트에 대한 제어권 획득");
-      return self.clients.claim();
-    })
+    caches
+      .keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            console.log("기존 캐시 삭제:", cacheName);
+            return caches.delete(cacheName);
+          })
+        );
+      })
+      .then(() => {
+        console.log("모든 클라이언트에 대한 제어권 획득");
+        return self.clients.claim();
+      })
   );
 });
 
@@ -107,8 +110,14 @@ self.addEventListener("notificationclick", (event) => {
     action: data.action,
     user_id: data.user_id,
     url: data.url,
+    source: data.source,
     dataKeys: Object.keys(data || {}),
   });
+  
+  // 특별히 매칭 알림인 경우 강조 표시
+  if (data.action === 'view_matches') {
+    console.log("🎯🎯🎯 매칭 알림 감지됨! user_id:", data.user_id);
+  }
 
   notification.close();
 
@@ -189,11 +198,11 @@ self.addEventListener("notificationclick", (event) => {
               type: "NAVIGATE",
               url: url,
               force: true,
-              timestamp: Date.now()
+              timestamp: Date.now(),
             });
-            
+
             console.log("📤 페이지 이동 메시지 전송 완료");
-            
+
             // 잠시 후 포커스
             setTimeout(() => {
               if (firstClient.focus) {
@@ -201,7 +210,7 @@ self.addEventListener("notificationclick", (event) => {
                 console.log("🎯 기존 탭 포커스 완료");
               }
             }, 100);
-            
+
             return Promise.resolve();
           } catch (err) {
             console.error("❌ postMessage 전송 실패:", err);

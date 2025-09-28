@@ -1826,6 +1826,7 @@ def send_test_notification():
         print(f"📝 요청 데이터: {data}")
         
         device_token = data.get('device_token')
+        test_type = data.get('test_type', 'basic')  # 'basic' 또는 'matching'
         title = data.get('title', '🔔 LOVE-CODE 테스트')
         body = data.get('body', '푸시 알림이 정상적으로 작동하고 있습니다! 🎉')
 
@@ -1853,11 +1854,25 @@ def send_test_notification():
         
         print(f"🔧 구독 정보 구성 완료: endpoint={subscription_info['endpoint'][:50]}...")
 
-        test_data = {
-            'action': 'test',
-            'timestamp': str(datetime.now()),
-            'source': 'vercel-test'
-        }
+        # 테스트 타입에 따라 다른 데이터 전송
+        if test_type == 'matching':
+            # 실제 매칭 알림과 동일한 데이터 구조
+            title = "🎉 사주 매칭이 완료되었습니다!"
+            body = "총 3명의 매칭 상대를 찾았어요. 확인해보세요!"
+            test_data = {
+                'action': 'view_matches',
+                'user_id': subscription.get('user_id', 1),  # 실제 user_id 사용
+                'source': 'test-matching'
+            }
+            print(f"🎯 매칭 테스트 데이터: {test_data}")
+        else:
+            # 기본 테스트
+            test_data = {
+                'action': 'test',
+                'timestamp': str(datetime.now()),
+                'source': 'vercel-test'
+            }
+            print(f"🔧 기본 테스트 데이터: {test_data}")
 
         print(f"📤 푸시 알림 전송 시도: {title}")
         result = send_push_notification(subscription_info, title, body, test_data)
@@ -1865,7 +1880,11 @@ def send_test_notification():
         
         if result:
             print("✅ 테스트 알림 전송 성공!")
-            return jsonify({'message': '테스트 알림이 성공적으로 전송되었습니다!'})
+            return jsonify({
+                'message': f'{test_type} 테스트 알림이 성공적으로 전송되었습니다!',
+                'test_type': test_type,
+                'data_sent': test_data
+            })
         else:
             print("❌ 테스트 알림 전송 실패")
             return jsonify({'error': '알림 전송에 실패했습니다. 서버 로그를 확인해주세요.'}), 500

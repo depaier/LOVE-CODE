@@ -188,25 +188,26 @@
         </div>
       </div>
 
-      <div>
-        <button class="btn" id="request-permission">🔔 알림 권한 요청</button>
-        <button class="btn" id="subscribe-push">📝 푸시 구독</button>
-        <button class="btn" id="send-test">🚀 테스트 알림 전송</button>
-        <button
-          class="btn"
-          id="debug-env"
-          style="
-            background: linear-gradient(
-              135deg,
-              #667eea 0%,
-              #764ba2 50%,
-              #667eea 100%
-            );
-          "
-        >
-          🔍 환경변수 확인
-        </button>
-      </div>
+       <div>
+         <button class="btn" id="request-permission">🔔 알림 권한 요청</button>
+         <button class="btn" id="subscribe-push">📝 푸시 구독</button>
+         <button class="btn" id="send-test">🚀 기본 테스트 알림</button>
+         <button class="btn" id="send-matching-test" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 50%, #ff6b6b 100%);">💕 매칭 알림 테스트</button>
+         <button
+           class="btn"
+           id="debug-env"
+           style="
+             background: linear-gradient(
+               135deg,
+               #667eea 0%,
+               #764ba2 50%,
+               #667eea 100%
+             );
+           "
+         >
+           🔍 환경변수 확인
+         </button>
+       </div>
 
       <div class="log-section">
         <h3>📝 로그</h3>
@@ -404,30 +405,76 @@
             button.disabled = true;
             button.textContent = "⏳ 전송 중...";
 
-            const response = await fetch("/api/push/test", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                device_token: deviceToken,
-              }),
-            });
+             const response = await fetch("/api/push/test", {
+               method: "POST",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({
+                 device_token: deviceToken,
+                 test_type: "basic"
+               }),
+             });
 
-            const result = await response.json();
+             const result = await response.json();
 
-            if (response.ok) {
-              addLog("🚀 테스트 알림 전송 성공!", "success");
-              addLog(`서버 응답: ${result.message}`, "info");
-            } else {
-              addLog(`테스트 알림 전송 실패: ${result.error}`, "error");
-            }
-          } catch (error) {
-            addLog(`테스트 전송 중 오류: ${error.message}`, "error");
-          } finally {
-            const button = document.getElementById("send-test");
-            button.disabled = false;
-            button.textContent = "🚀 테스트 알림 전송";
-          }
-        });
+             if (response.ok) {
+               addLog("🚀 기본 테스트 알림 전송 성공!", "success");
+               addLog(`서버 응답: ${result.message}`, "info");
+             } else {
+               addLog(`테스트 알림 전송 실패: ${result.error}`, "error");
+             }
+           } catch (error) {
+             addLog(`테스트 전송 중 오류: ${error.message}`, "error");
+           } finally {
+             const button = document.getElementById("send-test");
+             button.disabled = false;
+             button.textContent = "🚀 기본 테스트 알림";
+           }
+         });
+
+       // 매칭 알림 테스트 버튼
+       document
+         .getElementById("send-matching-test")
+         .addEventListener("click", async () => {
+           try {
+             if (!deviceToken) {
+               throw new Error(
+                 "디바이스 토큰이 없습니다. 먼저 푸시 구독을 해주세요."
+               );
+             }
+
+             const button = document.getElementById("send-matching-test");
+             button.disabled = true;
+             button.textContent = "⏳ 매칭 알림 전송 중...";
+
+             addLog("💕 매칭 알림 테스트 시작", "info");
+
+             const response = await fetch("/api/push/test", {
+               method: "POST",
+               headers: { "Content-Type": "application/json" },
+               body: JSON.stringify({
+                 device_token: deviceToken,
+                 test_type: "matching"
+               }),
+             });
+
+             const result = await response.json();
+
+             if (response.ok) {
+               addLog("💕 매칭 알림 테스트 전송 성공!", "success");
+               addLog(`서버 응답: ${result.message}`, "info");
+               addLog(`전송된 데이터: ${JSON.stringify(result.data_sent)}`, "info");
+               addLog("🎯 알림을 클릭해서 매칭 페이지로 이동하는지 확인하세요!", "warning");
+             } else {
+               addLog(`매칭 알림 테스트 실패: ${result.error}`, "error");
+             }
+           } catch (error) {
+             addLog(`매칭 알림 테스트 중 오류: ${error.message}`, "error");
+           } finally {
+             const button = document.getElementById("send-matching-test");
+             button.disabled = false;
+             button.textContent = "💕 매칭 알림 테스트";
+           }
+         });
 
       document
         .getElementById("debug-env")
