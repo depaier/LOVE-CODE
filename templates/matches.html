@@ -490,20 +490,19 @@
             console.log(
               `🔄 페이지 이동 요청: ${window.location.href} → ${event.data.url}`
             );
-            
+
             try {
               console.log("🚀 페이지 이동 실행 중...");
               window.location.href = event.data.url;
-              
+
               setTimeout(() => {
                 console.log("🔄 window.location.replace 시도");
                 window.location.replace(event.data.url);
               }, 100);
-              
             } catch (err) {
               console.error("❌ 페이지 이동 실패:", err);
               try {
-                window.open(event.data.url, '_blank');
+                window.open(event.data.url, "_blank");
                 console.log("🆕 새 창으로 열기 시도");
               } catch (openErr) {
                 console.error("❌ 새 창 열기도 실패:", openErr);
@@ -511,7 +510,7 @@
             }
           }
         });
-        
+
         navigator.serviceWorker.ready.then((registration) => {
           console.log("🔧 Service Worker 준비 완료, 메시지 수신 대기 중");
         });

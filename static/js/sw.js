@@ -194,34 +194,38 @@ self.addEventListener("notificationclick", (event) => {
         // 기존 탭이 있는 경우 처리
         if (clientList.length > 0) {
           console.log(`📱 기존 탭이 ${clientList.length}개 열려있습니다.`);
-          
+
           // 방법 1: 첫 번째 탭에서 직접 URL 변경 시도
           const firstClient = clientList[0];
-          
+
           try {
-            console.log(`🔄 첫 번째 탭에서 직접 URL 변경: ${firstClient.url} → ${url}`);
-            
+            console.log(
+              `🔄 첫 번째 탭에서 직접 URL 변경: ${firstClient.url} → ${url}`
+            );
+
             // navigate API 사용 시도 (새로운 방법)
             if (firstClient.navigate) {
               console.log("🚀 navigate API 사용");
-              return firstClient.navigate(url).then(() => {
-                console.log("✅ navigate API 성공");
-                return firstClient.focus();
-              }).catch((navErr) => {
-                console.log("❌ navigate API 실패:", navErr.message);
-                // navigate 실패 시 postMessage로 fallback
-                return tryPostMessage();
-              });
+              return firstClient
+                .navigate(url)
+                .then(() => {
+                  console.log("✅ navigate API 성공");
+                  return firstClient.focus();
+                })
+                .catch((navErr) => {
+                  console.log("❌ navigate API 실패:", navErr.message);
+                  // navigate 실패 시 postMessage로 fallback
+                  return tryPostMessage();
+                });
             } else {
               console.log("❌ navigate API 미지원, postMessage 시도");
               return tryPostMessage();
             }
-            
           } catch (err) {
             console.error("❌ 첫 번째 탭 처리 실패:", err);
             return tryPostMessage();
           }
-          
+
           function tryPostMessage() {
             try {
               firstClient.postMessage({
@@ -231,7 +235,7 @@ self.addEventListener("notificationclick", (event) => {
                 timestamp: Date.now(),
               });
               console.log("📤 postMessage 전송 완료");
-              
+
               // 잠시 후 포커스
               setTimeout(() => {
                 if (firstClient.focus) {
@@ -239,7 +243,7 @@ self.addEventListener("notificationclick", (event) => {
                   console.log("🎯 기존 탭 포커스 완료");
                 }
               }, 100);
-              
+
               return Promise.resolve();
             } catch (msgErr) {
               console.error("❌ postMessage 실패:", msgErr);
