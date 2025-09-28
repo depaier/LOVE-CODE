@@ -28,9 +28,8 @@
       href="https://fonts.googleapis.com/css2?family=BM+Hanna+Pro&display=swap"
       rel="stylesheet"
     />
-    
+
     <style>
-      
       @keyframes fadeIn {
         from {
           opacity: 0;
@@ -1392,10 +1391,36 @@
 
           if (event.data && event.data.type === "NAVIGATE" && event.data.url) {
             console.log(
-              `🔄 페이지 이동: ${window.location.href} → ${event.data.url}`
+              `🔄 페이지 이동 요청: ${window.location.href} → ${event.data.url}`
             );
-            window.location.href = event.data.url;
+            
+            try {
+              // 강제 페이지 이동
+              console.log("🚀 페이지 이동 실행 중...");
+              window.location.href = event.data.url;
+              
+              // 혹시 위가 안 되면 replace도 시도
+              setTimeout(() => {
+                console.log("🔄 window.location.replace 시도");
+                window.location.replace(event.data.url);
+              }, 100);
+              
+            } catch (err) {
+              console.error("❌ 페이지 이동 실패:", err);
+              // 최후의 수단: 새 창 열기
+              try {
+                window.open(event.data.url, '_blank');
+                console.log("🆕 새 창으로 열기 시도");
+              } catch (openErr) {
+                console.error("❌ 새 창 열기도 실패:", openErr);
+              }
+            }
           }
+        });
+        
+        // 메시지 수신 확인을 위한 추가 이벤트
+        navigator.serviceWorker.ready.then((registration) => {
+          console.log("🔧 Service Worker 준비 완료, 메시지 수신 대기 중");
         });
       }
 
