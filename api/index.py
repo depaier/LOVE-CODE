@@ -1798,22 +1798,50 @@ def push_test():
     """푸시 알림 테스트 페이지"""
     return render_template('push_test.html')
 
+@app.route('/api/debug/env', methods=['GET'])
+def debug_env():
+    """환경변수 디버깅 (보안: 키는 마스킹됨)"""
+    try:
+        VAPID_EMAIL = os.getenv('VAPID_EMAIL')
+        VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY')
+        VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY')
+        SUPABASE_URL = os.getenv('SUPABASE_URL')
+        
+        return jsonify({
+            'vapid_email': VAPID_EMAIL if VAPID_EMAIL else '❌ 없음',
+            'vapid_public_key': f"{VAPID_PUBLIC_KEY[:10]}..." if VAPID_PUBLIC_KEY else '❌ 없음',
+            'vapid_private_key': f"{VAPID_PRIVATE_KEY[:10]}..." if VAPID_PRIVATE_KEY else '❌ 없음',
+            'supabase_url': f"{SUPABASE_URL[:20]}..." if SUPABASE_URL else '❌ 없음',
+            'pywebpush_available': True
+        })
+    except Exception as e:
+        return jsonify({'error': f'환경변수 확인 중 오류: {e}'}), 500
+
 @app.route('/api/push/test', methods=['POST'])
 def send_test_notification():
     """테스트 푸시 알림 전송"""
     try:
+        print("🧪 테스트 알림 요청 시작")
         data = request.get_json()
+        print(f"📝 요청 데이터: {data}")
+        
         device_token = data.get('device_token')
-        title = data.get('title', '테스트 알림')
-        body = data.get('body', '푸시 알림이 정상적으로 작동하고 있습니다!')
+        title = data.get('title', '🔔 LOVE-CODE 테스트')
+        body = data.get('body', '푸시 알림이 정상적으로 작동하고 있습니다! 🎉')
 
         if not device_token:
+            print("❌ device_token이 없습니다")
             return jsonify({'error': 'device_token이 필요합니다'}), 400
 
+        print(f"🔍 디바이스 토큰으로 구독 정보 조회: {device_token}")
+        
         # 디바이스 토큰으로 구독 정보 조회
         subscription = get_push_subscription(device_token)
+        print(f"📋 조회된 구독 정보: {subscription}")
+        
         if not subscription:
-            return jsonify({'error': '등록되지 않은 디바이스 토큰입니다'}), 400
+            print("❌ 등록되지 않은 디바이스 토큰")
+            return jsonify({'error': '등록되지 않은 디바이스 토큰입니다. 먼저 푸시 구독을 해주세요.'}), 400
 
         subscription_info = {
             'endpoint': subscription['endpoint'],
@@ -1822,19 +1850,31 @@ def send_test_notification():
                 'auth': subscription['auth']
             }
         }
+        
+        print(f"🔧 구독 정보 구성 완료: endpoint={subscription_info['endpoint'][:50]}...")
 
         test_data = {
             'action': 'test',
-            'timestamp': str(datetime.now())
+            'timestamp': str(datetime.now()),
+            'source': 'vercel-test'
         }
 
-        if send_push_notification(subscription_info, title, body, test_data):
-            return jsonify({'message': '테스트 알림이 전송되었습니다'})
+        print(f"📤 푸시 알림 전송 시도: {title}")
+        result = send_push_notification(subscription_info, title, body, test_data)
+        print(f"📊 전송 결과: {result}")
+        
+        if result:
+            print("✅ 테스트 알림 전송 성공!")
+            return jsonify({'message': '테스트 알림이 성공적으로 전송되었습니다!'})
         else:
-            return jsonify({'error': '알림 전송에 실패했습니다'}), 500
+            print("❌ 테스트 알림 전송 실패")
+            return jsonify({'error': '알림 전송에 실패했습니다. 서버 로그를 확인해주세요.'}), 500
 
     except Exception as e:
-        return jsonify({'error': f'테스트 알림 전송 중 오류 발생: {e}'}), 500
+        print(f"❌ 테스트 알림 전송 중 예외 발생: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'테스트 알림 전송 중 오류 발생: {str(e)}'}), 500
 
 @app.route('/saju', methods=['POST'])
 def analyze_saju():
