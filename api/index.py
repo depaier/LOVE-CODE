@@ -811,7 +811,7 @@ def send_push_notification(subscription_info, title, body, data=None):
         VAPID_EMAIL = os.getenv('VAPID_EMAIL')
         VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY')
         VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY')
-        APP_URL = os.getenv('APP_URL', 'https://saju-matching.vercel.app')
+        APP_URL = os.getenv('APP_URL', 'https://love-code-eta.vercel.app/')
         
         if not all([VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY]):
             print("❌ VAPID 키가 설정되지 않았습니다.")
