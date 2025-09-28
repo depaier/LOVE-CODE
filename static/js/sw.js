@@ -1,5 +1,6 @@
 // Service Worker for Push Notifications
 // 사주 매칭 서비스 푸시 알림용 Service Worker
+// Version: 2024-09-29-v2
 
 // Service Worker 설치 이벤트
 self.addEventListener("install", (event) => {
@@ -10,9 +11,21 @@ self.addEventListener("install", (event) => {
 
 // Service Worker 활성화 이벤트
 self.addEventListener("activate", (event) => {
-  console.log("Service Worker 활성화됨");
-  // 기존 Service Worker 정리
-  event.waitUntil(self.clients.claim());
+  console.log("Service Worker 활성화됨 - Version: 2024-09-29-v2");
+  // 기존 캐시 정리 및 즉시 제어권 획득
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          console.log("기존 캐시 삭제:", cacheName);
+          return caches.delete(cacheName);
+        })
+      );
+    }).then(() => {
+      console.log("모든 클라이언트에 대한 제어권 획득");
+      return self.clients.claim();
+    })
+  );
 });
 
 // 푸시 메시지 수신 이벤트
@@ -164,19 +177,39 @@ self.addEventListener("notificationclick", (event) => {
 
         // 매칭 결과 페이지로 가야 하는데 다른 페이지가 열려있다면
         // 기존 탭에서 URL 변경을 시도
-        if (clientList.length > 0 && url.includes("/matches/")) {
+        if (clientList.length > 0) {
           const firstClient = clientList[0];
           console.log(
             `🔄 기존 탭에서 URL 변경 시도: ${firstClient.url} → ${url}`
           );
 
-          // postMessage로 페이지 이동 요청
-          firstClient.postMessage({
-            type: "NAVIGATE",
-            url: url,
-          });
-
-          return firstClient.focus();
+          // postMessage로 페이지 이동 요청 - 더 강력한 방식
+          try {
+            firstClient.postMessage({
+              type: "NAVIGATE",
+              url: url,
+              force: true,
+              timestamp: Date.now()
+            });
+            
+            console.log("📤 페이지 이동 메시지 전송 완료");
+            
+            // 잠시 후 포커스
+            setTimeout(() => {
+              if (firstClient.focus) {
+                firstClient.focus();
+                console.log("🎯 기존 탭 포커스 완료");
+              }
+            }, 100);
+            
+            return Promise.resolve();
+          } catch (err) {
+            console.error("❌ postMessage 전송 실패:", err);
+            // postMessage 실패 시 새 창으로 열기
+            if (clients.openWindow) {
+              return clients.openWindow(url);
+            }
+          }
         }
 
         // 새 창 열기 (iOS Safari에서는 새로운 탭으로 열림)
