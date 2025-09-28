@@ -493,6 +493,75 @@
       </div>
       -->
 
+      <!-- 사주 분석 완료 후 버튼들 (사주 분석 완료 후에만 표시) -->
+      <div
+        id="my-results-section"
+        style="
+          margin-bottom: 20px;
+          display: none;
+          flex-direction: column;
+          align-items: center;
+          gap: 15px;
+        "
+      >
+        <button
+          type="button"
+          id="my-saju-btn"
+          style="
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 15px 30px;
+            font-size: 1.3em;
+            font-family: 'BM Hanna Pro', cursive;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+            width: 100%;
+            max-width: 300px;
+          "
+          onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(78, 205, 196, 0.4)'"
+          onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(78, 205, 196, 0.3)'"
+        >
+          🔮 내 사주 결과 보기
+        </button>
+
+        <button
+          type="button"
+          id="my-matches-btn"
+          style="
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 15px 30px;
+            font-size: 1.3em;
+            font-family: 'BM Hanna Pro', cursive;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+            width: 100%;
+            max-width: 300px;
+          "
+          onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(255, 107, 107, 0.4)'"
+          onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(255, 107, 107, 0.3)'"
+        >
+          💕 내 매칭 결과 보기
+        </button>
+
+        <div
+          id="user-info"
+          style="
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #666;
+            font-weight: bold;
+            text-align: center;
+          "
+        ></div>
+      </div>
+
       <!-- 푸시 알림 설정 버튼 -->
       <div style="text-align: center; margin-bottom: 30px">
         <button
@@ -640,7 +709,7 @@
       </form>
     </div>
 
-    <!-- 모달 창 -->
+    <!-- 사주 분석 모달 창 -->
     <div id="result-modal" class="modal">
       <div class="modal-content">
         <span class="close" title="닫기">&times;</span>
@@ -652,6 +721,19 @@
         </div>
         <div id="loader"></div>
         <div id="result-text"></div>
+      </div>
+    </div>
+
+    <!-- 내 사주 결과 모달 창 -->
+    <div id="my-saju-modal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeMySajuModal()" title="닫기"
+          >&times;</span
+        >
+        <h2 style="color: #5a3a22; margin-bottom: 20px; text-align: center">
+          🔮 내 사주 분석 결과
+        </h2>
+        <div id="my-saju-content"></div>
       </div>
     </div>
     <script>
@@ -681,6 +763,13 @@
         loadingMessage.classList.remove("visible");
         loader.style.display = "none";
         isLoading = false; // 로딩 상태 초기화
+      }
+
+      // 내 사주 모달 닫기 함수
+      function closeMySajuModal() {
+        const mySajuModal = document.getElementById("my-saju-modal");
+        mySajuModal.style.display = "none";
+        document.body.style.overflow = "auto"; // 배경 스크롤 복원
       }
 
       // 테스트 모달 열기 함수 주석처리
@@ -748,6 +837,12 @@
         if (event.target == modal) {
           closeModal();
         }
+
+        // 내 사주 모달 닫기
+        const mySajuModal = document.getElementById("my-saju-modal");
+        if (event.target == mySajuModal) {
+          closeMySajuModal();
+        }
       }
 
       window.onclick = handleModalClose;
@@ -755,13 +850,17 @@
 
       // ESC 키로 모달 닫기
       document.addEventListener("keydown", function (event) {
-        // 로딩 중에는 ESC 키로도 모달을 닫을 수 없음
-        if (
-          event.key === "Escape" &&
-          modal.style.display === "block" &&
-          !isLoading
-        ) {
-          closeModal();
+        if (event.key === "Escape") {
+          // 사주 분석 모달 닫기 (로딩 중이 아닐 때만)
+          if (modal.style.display === "block" && !isLoading) {
+            closeModal();
+          }
+
+          // 내 사주 모달 닫기
+          const mySajuModal = document.getElementById("my-saju-modal");
+          if (mySajuModal.style.display === "block") {
+            closeMySajuModal();
+          }
         }
       });
 
@@ -850,8 +949,15 @@
               "📱 먼저 '홈 화면에 추가'를 해야 푸시 알림을 사용할 수 있습니다.";
             color = "#ff6b35";
           } else if (Notification.permission === "granted") {
-            status = "✅ 푸시 알림 권한이 허용되었습니다.";
-            color = "#28a745";
+            // 푸시 알림이 이미 허용되었으면 버튼과 상태 메시지 모두 숨기기
+            const pushButton = document.getElementById("push-settings-btn");
+            if (pushButton) {
+              pushButton.style.display = "none";
+            }
+            if (statusEl) {
+              statusEl.style.display = "none";
+            }
+            return; // 상태 업데이트 생략
           } else if (Notification.permission === "denied") {
             status = "❌ 푸시 알림 권한이 차단되었습니다.";
             color = "#dc3545";
@@ -953,9 +1059,9 @@
               }
             } else if (permission === "denied") {
               if (isIOS && isSafari) {
-                // 권한 거부 시 홈화면 추가 안내 alert로 변경
+                // 권한 거부 시 홈화면 추가 안내
                 alert(
-                  "📱 iOS Safari에서 푸시 알림을 사용하려면 먼저 홈 화면에 추가해주세요.\n\nSafari 하단 공유 버튼(□) → 홈 화면에 추가"
+                  "📱 iOS Safari에서 푸시 알림을 사용하려면 홈 화면에 추가가 필요합니다.\n\nSafari 하단 공유 버튼 → 홈 화면에 추가"
                 );
               }
             }
@@ -1064,6 +1170,85 @@
       // 푸시 알림 관리자 인스턴스 생성
       const pushManager = new PushNotificationManager();
 
+      // 사용자 정보 관리 클래스
+      class UserManager {
+        constructor() {
+          this.loadUserInfo();
+          this.updateMyResultsSection();
+        }
+
+        loadUserInfo() {
+          const userData = localStorage.getItem("userData");
+          if (userData) {
+            try {
+              this.userInfo = JSON.parse(userData);
+            } catch (error) {
+              console.error("사용자 정보 로드 실패:", error);
+              this.userInfo = null;
+            }
+          } else {
+            this.userInfo = null;
+          }
+        }
+
+        saveUserInfo(userData) {
+          this.userInfo = userData;
+          localStorage.setItem("userData", JSON.stringify(userData));
+          this.updateMyResultsSection();
+        }
+
+        updateMyResultsSection() {
+          const section = document.getElementById("my-results-section");
+          const userInfoDiv = document.getElementById("user-info");
+          const matchesButton = document.getElementById("my-matches-btn");
+          const sajuButton = document.getElementById("my-saju-btn");
+
+          if (this.userInfo && this.userInfo.user_id) {
+            section.style.display = "flex";
+            userInfoDiv.textContent = `${this.userInfo.name}님 (학번: ${this.userInfo.studentId})`;
+
+            // 매칭 결과 버튼 클릭 이벤트
+            matchesButton.onclick = () => {
+              window.location.href = `/matches/${this.userInfo.user_id}`;
+            };
+
+            // 사주 결과 버튼 클릭 이벤트
+            sajuButton.onclick = () => {
+              this.showMySajuResult();
+            };
+          } else {
+            section.style.display = "none";
+          }
+        }
+
+        showMySajuResult() {
+          if (this.userInfo && this.userInfo.ai_analysis) {
+            const modal = document.getElementById("my-saju-modal");
+            const content = document.getElementById("my-saju-content");
+
+            content.innerHTML = `
+              <div style="background-color: #fdfaf3; border: 2px solid #bda08c; border-radius: 4px; padding: 20px; line-height: 1.8; font-size: 1.4em; color: #3a3a3a; white-space: pre-wrap;">
+                ${this.userInfo.ai_analysis}
+              </div>
+            `;
+
+            modal.style.display = "block";
+            document.body.style.overflow = "hidden"; // 배경 스크롤 방지
+          } else {
+            alert("저장된 사주 분석 결과가 없습니다.");
+          }
+        }
+
+        clearUserInfo() {
+          this.userInfo = null;
+          localStorage.removeItem("userData");
+          this.updateMyResultsSection();
+        }
+      }
+
+      // 사용자 관리자 인스턴스 생성
+      const userManager = new UserManager();
+
       // 푸시 설정 버튼 이벤트
       document
         .getElementById("push-settings-btn")
@@ -1085,15 +1270,13 @@
             if (permissionGranted) {
               const subscribed = await pushManager.subscribeToPush();
               if (subscribed) {
-                if (isIOS && isSafari) {
-                  alert(
-                    "✅ iOS Safari에서 푸시 알림이 설정되었습니다!\n\n📱 테스트 방법:\n1. Safari를 백그라운드로 전환 (홈 버튼)\n2. 잠시 기다렸다가 관리자가 매칭을 실행\n3. 알림이 도착하면 탭하여 확인\n\n💡 알림이 안 오면 Safari 설정을 확인해주세요."
-                  );
-                } else {
-                  alert(
-                    "✅ 푸시 알림이 성공적으로 설정되었습니다!\n매칭이 완료되면 알림을 보내드립니다."
-                  );
-                }
+                alert(
+                  "✅ 푸시 알림이 성공적으로 설정되었습니다!\n매칭이 완료되면 알림을 보내드립니다."
+                );
+                // 푸시 알림 설정이 완료되면 버튼과 상태 메시지 숨기기
+                document.getElementById("push-settings-btn").style.display =
+                  "none";
+                document.getElementById("push-status").style.display = "none";
               } else {
                 alert(
                   "푸시 알림 구독에 실패했습니다.\n잠시 후 다시 시도해주세요."
@@ -1176,9 +1359,20 @@
           if (response.ok) {
             showResult(result.ai_analysis);
 
-            // 사용자 ID가 있으면 디바이스 연결
+            // 사용자 ID가 있으면 디바이스 연결 및 사용자 정보 저장
             if (result.user_id) {
               await pushManager.linkDeviceToUser(result.user_id);
+
+              // 사용자 정보를 로컬 스토리지에 저장
+              const userData = {
+                user_id: result.user_id,
+                name: data.name,
+                studentId: data.studentId,
+                mbti: data.mbti,
+                gender: data.gender,
+                ai_analysis: result.ai_analysis,
+              };
+              userManager.saveUserInfo(userData);
             }
           } else {
             showResult("오류가 발생했습니다: " + result.error);
@@ -1187,6 +1381,35 @@
           showResult(
             "서버와 통신하는 데 실패했습니다. 서버가 켜져 있는지 확인해주세요."
           );
+        }
+      });
+
+      // Service Worker 메시지 수신 처리 (알림 클릭 시 페이지 이동)
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.addEventListener("message", function (event) {
+          console.log("📨 Service Worker 메시지 수신:", event.data);
+
+          if (event.data && event.data.type === "NAVIGATE" && event.data.url) {
+            console.log(
+              `🔄 페이지 이동: ${window.location.href} → ${event.data.url}`
+            );
+            window.location.href = event.data.url;
+          }
+        });
+      }
+
+      // 페이지 로드 시 URL 파라미터 확인 (알림에서 홈으로 온 경우)
+      document.addEventListener("DOMContentLoaded", function () {
+        const urlParams = new URLSearchParams(window.location.search);
+        const notification = urlParams.get("notification");
+
+        if (notification === "waiting") {
+          // 매칭 대기 중 알림에서 온 경우
+          setTimeout(() => {
+            alert(
+              "⏳ 아직 매칭이 진행 중입니다.\n매칭이 완료되면 알림을 보내드릴게요!"
+            );
+          }, 500);
         }
       });
     </script>

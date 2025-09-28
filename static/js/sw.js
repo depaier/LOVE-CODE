@@ -68,17 +68,40 @@ self.addEventListener("push", (event) => {
 
 // 알림 클릭 이벤트
 self.addEventListener("notificationclick", (event) => {
-  console.log("알림 클릭됨:", event);
+  console.log("🔔 알림 클릭됨:", event);
+  console.log("📝 알림 제목:", event.notification.title);
+  console.log("📝 알림 내용:", event.notification.body);
 
   const notification = event.notification;
   const action = event.action;
-  const data = notification.data || {};
+  let data = notification.data || {};
+
+  // 데이터가 문자열로 오는 경우 파싱
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+      console.log("📝 문자열 데이터를 JSON으로 파싱했습니다:", data);
+    } catch (e) {
+      console.error("❌ JSON 파싱 실패:", e);
+      data = {};
+    }
+  }
+
+  console.log("📊 알림 액션:", action);
+  console.log("📊 알림 데이터:", JSON.stringify(data));
+  console.log("📊 데이터 타입:", typeof data);
+  console.log("📊 데이터 구조 상세:", {
+    action: data.action,
+    user_id: data.user_id,
+    url: data.url,
+    dataKeys: Object.keys(data || {}),
+  });
 
   notification.close();
 
   // 액션에 따른 처리
   if (action === "dismiss") {
-    // 닫기 액션 - 아무것도 하지 않음
+    console.log("❌ 사용자가 알림을 닫았습니다");
     return;
   }
 
@@ -88,28 +111,76 @@ self.addEventListener("notificationclick", (event) => {
   // 데이터에 따라 다른 URL로 이동
   if (data.action === "view_matches" && data.user_id) {
     url = `/matches/${data.user_id}?notification=match_complete`;
+    console.log("🎯 매칭 결과 페이지로 이동:", url);
+  } else if (data.action === "view_home") {
+    url = "/?notification=waiting";
+    console.log("🎯 홈페이지로 이동 (매칭 대기):", url);
   } else if (data.url) {
     url = data.url;
+    console.log("🎯 사용자 지정 URL로 이동:", url);
+  } else {
+    console.log("⚠️ 유효한 데이터가 없어 홈페이지로 이동:", url);
+    console.log("📊 확인된 데이터:", {
+      action: data.action,
+      user_id: data.user_id,
+      url: data.url,
+    });
   }
 
   event.waitUntil(
     clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((clientList) => {
+        console.log(`🔍 현재 열린 탭 수: ${clientList.length}개`);
+        console.log(`🎯 이동할 URL: ${url}`);
+
         // iOS Safari 호환성을 위해 더 간단한 방식 사용
         const isIOS = clientList.some((client) =>
           /iPad|iPhone|iPod/.test(client.userAgent || "")
         );
 
-        // 이미 열려있는 창이 있는지 확인
+        // 이미 열려있는 창에서 정확한 URL이 있는지 확인
+        let foundMatchingClient = null;
         for (let i = 0; i < clientList.length; i++) {
           const client = clientList[i];
-          if (client.url.includes(url) && "focus" in client) {
-            return client.focus();
+          console.log(`📋 탭 ${i + 1}: ${client.url}`);
+
+          // 정확히 같은 URL을 가진 탭 찾기
+          if (
+            client.url === url ||
+            client.url.split("?")[0] === url.split("?")[0]
+          ) {
+            foundMatchingClient = client;
+            console.log(`✅ 동일한 페이지를 찾았습니다: ${client.url}`);
+            break;
           }
         }
 
+        // 정확히 같은 URL의 탭이 있으면 포커스
+        if (foundMatchingClient && "focus" in foundMatchingClient) {
+          console.log(`🎯 기존 탭으로 포커스 이동`);
+          return foundMatchingClient.focus();
+        }
+
+        // 매칭 결과 페이지로 가야 하는데 다른 페이지가 열려있다면
+        // 기존 탭에서 URL 변경을 시도
+        if (clientList.length > 0 && url.includes("/matches/")) {
+          const firstClient = clientList[0];
+          console.log(
+            `🔄 기존 탭에서 URL 변경 시도: ${firstClient.url} → ${url}`
+          );
+
+          // postMessage로 페이지 이동 요청
+          firstClient.postMessage({
+            type: "NAVIGATE",
+            url: url,
+          });
+
+          return firstClient.focus();
+        }
+
         // 새 창 열기 (iOS Safari에서는 새로운 탭으로 열림)
+        console.log(`🆕 새 창을 엽니다: ${url}`);
         if (clients.openWindow) {
           return clients.openWindow(url);
         }

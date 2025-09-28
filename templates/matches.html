@@ -46,6 +46,8 @@
         max-width: 800px;
         margin: 0 auto;
         animation: fadeIn 0.8s ease-out;
+        box-sizing: border-box;
+        width: 100%;
       }
 
       .header {
@@ -195,12 +197,15 @@
 
       .footer-buttons {
         text-align: center;
-        margin-top: 40px;
+        margin: 40px auto 0;
         padding: 30px;
         background-color: #ffffff;
         border: 3px solid #8a6d59;
         border-radius: 4px;
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
       }
 
       .footer-buttons .btn {
@@ -237,12 +242,20 @@
 
       /* 모바일 반응형 */
       @media (max-width: 768px) {
+        body {
+          padding: 15px 10px;
+        }
+
         .header h1 {
           font-size: 2.5em;
         }
 
         .header .subtitle {
           font-size: 1.3em;
+        }
+
+        .header {
+          padding: 25px;
         }
 
         .match-header {
@@ -263,20 +276,36 @@
           font-size: 1.2em;
         }
 
+        .footer-buttons {
+          padding: 20px 15px;
+          margin: 30px auto 0;
+          width: calc(100% - 30px);
+          max-width: calc(100% - 30px);
+        }
+
         .footer-buttons .btn {
           display: block;
-          margin: 10px 0;
+          margin: 10px auto;
           width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
       }
 
       @media (max-width: 480px) {
+        body {
+          padding: 10px 5px;
+        }
+
         .container {
-          padding: 10px;
+          padding: 0;
+          width: 100%;
+          max-width: 100%;
         }
 
         .header {
-          padding: 20px;
+          padding: 15px;
+          margin-bottom: 20px;
         }
 
         .header h1 {
@@ -284,7 +313,11 @@
         }
 
         .match-card {
-          padding: 20px;
+          padding: 15px;
+          margin-bottom: 15px;
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
         }
 
         .match-name {
@@ -294,6 +327,21 @@
         .matching-reason {
           font-size: 1.1em;
           padding: 15px;
+        }
+
+        .footer-buttons {
+          padding: 15px 10px;
+          margin: 20px auto 0;
+          width: calc(100% - 20px);
+          max-width: calc(100% - 20px);
+        }
+
+        .footer-buttons .btn {
+          padding: 10px 20px;
+          font-size: 1.2em;
+          margin: 8px auto;
+          width: 100%;
+          max-width: 100%;
         }
       }
     </style>
@@ -432,6 +480,20 @@
           }, index * 100);
         });
       });
+
+      // Service Worker 메시지 수신 처리 (알림 클릭 시 페이지 이동)
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.addEventListener("message", function (event) {
+          console.log("📨 Service Worker 메시지 수신:", event.data);
+
+          if (event.data && event.data.type === "NAVIGATE" && event.data.url) {
+            console.log(
+              `🔄 페이지 이동: ${window.location.href} → ${event.data.url}`
+            );
+            window.location.href = event.data.url;
+          }
+        });
+      }
     </script>
   </body>
 </html>

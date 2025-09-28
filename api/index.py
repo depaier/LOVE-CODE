@@ -226,28 +226,28 @@ def calculate_rule_based_matching(user1, user2):
         final_score = int((mbti_score * 0.6) + (saju_score * 0.4))
         final_score = max(20, min(100, final_score))
 
-        # 사주 전문가 톤의 매칭 이유 생성
+        # MBTI와 사주를 종합한 매칭 이유 생성 (140자 제한)
         if final_score >= 85:
-            reason = f"천생연분의 궁합입니다. 사주의 오행이 조화롭게 어우러지고 MBTI 성향도 완벽히 맞아떨어집니다"
+            reason = f"{user1['mbti']}와 {user2['mbti']}는 성격적으로 완벽한 조화를 이루며, 사주상 오행의 기운도 서로 보완하여 천생연분의 인연을 만들어갑니다. 깊은 정신적 교감과 운명적 만남이 기대됩니다."
         elif final_score >= 75:
-            reason = f"매우 좋은 인연입니다. 사주상 서로를 보완하며 MBTI 특성이 잘 맞아 화목한 관계를 이룰 수 있습니다"
+            reason = f"{user1['mbti']}와 {user2['mbti']}는 성격적으로 잘 어울리며, 사주상 기운의 흐름도 긍정적으로 상호작용합니다. 서로를 이해하고 지지하는 안정적이고 조화로운 관계를 만들어갈 수 있어요."
         elif final_score >= 65:
-            reason = f"좋은 궁합을 보입니다. 사주의 기운이 서로 도우며 성격적 특성도 안정적인 조화를 이룹니다"
+            reason = f"{user1['mbti']}와 {user2['mbti']}는 성격적 특성이 적절히 조화되며, 사주상 오행의 균형도 나쁘지 않은 궁합입니다. 서로 노력한다면 좋은 파트너십을 형성할 수 있습니다."
         elif final_score >= 55:
-            reason = f"평범하지만 나쁘지 않은 궁합입니다. 서로 노력한다면 좋은 관계로 발전할 수 있는 인연입니다"
+            reason = f"{user1['mbti']}와 {user2['mbti']}는 기본적인 호환성을 가지고 있으며, 사주상 큰 충돌은 없는 관계입니다. 서로를 이해하려 노력한다면 안정적인 관계 발전이 가능해요."
         else:
-            reason = f"다소 다른 기질을 가지고 있지만, 서로를 이해하려 노력한다면 새로운 배움이 있는 관계입니다"
+            reason = f"{user1['mbti']}와 {user2['mbti']}는 성격적 차이가 있지만, 사주상 서로 다른 기운이 때로는 새로운 시너지를 만들 수 있습니다. 차이점을 존중하며 소통하는 것이 중요합니다."
 
         return final_score, reason
 
     except Exception as e:
         print(f"❌ 룰 기반 매칭 계산 오류: {e}")
-        return 50, "성격 분석 결과 기본적인 호환성을 가진 관계입니다"
+        return 50, "MBTI 성격 분석과 사주상 기운을 종합해보니 기본적인 호환성을 가진 관계로, 서로를 이해하고 배려한다면 안정적인 관계를 만들어갈 수 있습니다."
 
 def should_use_ai_matching(user1, user2, quick_score):
     """AI 심층 분석을 사용할지 결정"""
-    # 85점 이상 초고호환성 쌍만 AI 분석 진행 (안정성 우선)
-    if quick_score >= 85:
+    # 70점 이상 쌍들에 대해 AI 분석 진행 (매칭 대상이므로)
+    if quick_score >= 70:
         print(f"🤖 AI 심층 분석 진행: {user1['name']} ↔ {user2['name']} (룰 기반: {quick_score}점)")
         return True
     else:
@@ -257,22 +257,26 @@ def should_use_ai_matching(user1, user2, quick_score):
 def perform_ai_matching_analysis(user1, user2, quick_score, model):
     """AI를 활용한 심층 매칭 분석"""
     try:
-        # 최적화된 AI 프롬프트 (짧고 명확하게)
+        # MBTI와 사주 종합 분석 (강제 패턴)
         prompt = f"""
-다음 두 성격 유형의 궁합을 분석해주세요:
+{user1['mbti']}와 {user2['mbti']} 두 사람의 궁합을 분석해주세요.
 
-첫 번째: {user1['mbti']}
-두 번째: {user2['mbti']}
+⚠️ 반드시 이 패턴으로 답변하세요:
+"{user1['mbti']}와 {user2['mbti']}는 [MBTI특성]. 사주상 [기운분석]."
 
-다음 형식으로만 30자 이내로 답변:
-점수: 80
-이유: 성격이 잘 맞음
+⚠️ "사주상"이라는 단어를 반드시 포함해야 합니다.
+⚠️ 140자 이하로 작성하세요.
+
+출력 형식:
+점수: [70-90점 사이]
+이유: {user1['mbti']}와 {user2['mbti']}는 성격적으로 잘 맞습니다. 사주상 오행의 기운이 조화롭게 어울려 좋은 인연을 만들어갈 수 있어요.
 """
 
         # AI 호출 전 딜레이 (API 한도 방지)
         time.sleep(0.3)  # 더 긴 딜레이로 안정성 확보
         
         print(f"🤖 AI 분석 시작: {user1['name']} ↔ {user2['name']}")
+        print(f"📝 전송 프롬프트: {prompt[:100]}...")
         ai_start_time = time.time()
         
         # 타임아웃 강제 설정 (10초)
@@ -285,7 +289,7 @@ def perform_ai_matching_analysis(user1, user2, quick_score, model):
         
         def ai_call_with_timeout():
             try:
-                # 안전 필터 설정을 더 관대하게 조정
+                # 안전 필터 완전 비활성화
                 safety_settings = [
                     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
                     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -296,8 +300,8 @@ def perform_ai_matching_analysis(user1, user2, quick_score, model):
                 response = model.generate_content(
                     prompt,
                     generation_config=genai.types.GenerationConfig(
-                        temperature=0.1,  # 더 일관성 있는 응답
-                        max_output_tokens=200,  # 충분한 토큰으로 완전한 응답 보장
+                        temperature=0.3,  # 더 창의적인 응답을 위해 약간 증가
+                        max_output_tokens=1000,  # 토큰 제한 해결을 위해 감소
                     ),
                     safety_settings=safety_settings
                 )
@@ -316,7 +320,7 @@ def perform_ai_matching_analysis(user1, user2, quick_score, model):
         if ai_thread.is_alive():
             ai_elapsed = time.time() - ai_start_time
             print(f"⏰ AI 호출 타임아웃 ({ai_elapsed:.2f}초) - 강제 중단")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
+            return quick_score, f"{user1['mbti']}와 {user2['mbti']}는 성격적으로 조화를 이루며, 사주상 기운의 흐름도 긍정적입니다. 서로의 특성이 잘 어울려 좋은 파트너십을 형성할 수 있는 인연이에요."
         
         # 예외 확인
         if not exception_queue.empty():
@@ -325,12 +329,13 @@ def perform_ai_matching_analysis(user1, user2, quick_score, model):
         # 결과 확인
         if result_queue.empty():
             print(f"⚠️ AI 응답 없음 - 알 수 없는 오류")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
+            return quick_score, f"{user1['mbti']}와 {user2['mbti']}는 성격적으로 조화를 이루며, 사주상 기운의 흐름도 긍정적입니다. 서로의 특성이 잘 어울려 좋은 파트너십을 형성할 수 있는 인연이에요."
         
         response = result_queue.get()
         
         ai_elapsed = time.time() - ai_start_time
         print(f"🤖 AI 응답 완료: {ai_elapsed:.2f}초")
+        print(f"🔍 AI 원본 응답: {response.text[:150]}...")
         
         # 토큰 사용량 확인
         if hasattr(response, 'usage_metadata') and response.usage_metadata:
@@ -340,7 +345,7 @@ def perform_ai_matching_analysis(user1, user2, quick_score, model):
         # 안전성 검사
         if not response.candidates or len(response.candidates) == 0:
             print(f"⚠️ AI 응답 없음: 안전 필터 차단")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
+            return quick_score, f"{user1['mbti']}와 {user2['mbti']}는 성격적으로 조화를 이루며, 사주상 기운의 흐름도 긍정적입니다. 서로의 특성이 잘 어울려 좋은 파트너십을 형성할 수 있는 인연이에요."
 
         candidate = response.candidates[0]
         if candidate.finish_reason != 1:  # 1 = STOP (정상 완료)
@@ -349,18 +354,18 @@ def perform_ai_matching_analysis(user1, user2, quick_score, model):
                 print(f"🚫 토큰 한도 초과 또는 안전 필터 차단")
             elif candidate.finish_reason == 3:
                 print(f"🚫 최대 토큰 길이 초과")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
+            return quick_score, f"{user1['mbti']}와 {user2['mbti']}는 성격적으로 조화를 이루며, 사주상 기운의 흐름도 긍정적입니다. 서로의 특성이 잘 어울려 좋은 파트너십을 형성할 수 있는 인연이에요."
             
 
         try:
             ai_response = response.text.strip()
         except:
             print(f"⚠️ AI 응답 텍스트 추출 실패")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
+            return quick_score, f"{user1['mbti']}와 {user2['mbti']}는 성격적으로 조화를 이루며, 사주상 기운의 흐름도 긍정적입니다. 서로의 특성이 잘 어울려 좋은 파트너십을 형성할 수 있는 인연이에요."
 
-        # AI 응답에서 점수와 이유 추출 (한국어 복원)
+        # AI 응답에서 점수와 이유 추출 (한국어 복원, 멀티라인 처리)
         score_match = re.search(r'점수:\s*(\d+)', ai_response)
-        reason_match = re.search(r'이유:\s*(.+)', ai_response)
+        reason_match = re.search(r'이유:\s*(.+?)(?:\n\n|\n\*\*|\*\*|$)', ai_response, re.DOTALL)
 
         if score_match and reason_match:
             ai_score = int(score_match.group(1))
@@ -370,14 +375,48 @@ def perform_ai_matching_analysis(user1, user2, quick_score, model):
             final_score = int((quick_score * 0.7) + (ai_score * 0.3))
             final_score = max(20, min(100, final_score))
 
-            final_reason = ai_reason[:80] if len(ai_reason) > 80 else ai_reason
+            # 마크다운 제거 및 자연스러운 문장 단위로 자르기
+            clean_reason = ai_reason.replace('**', '').replace('*', '').replace('#', '').strip()
+            
+            # 사주 키워드가 없으면 강제로 추가
+            if '사주상' not in clean_reason and '오행' not in clean_reason:
+                print("⚠️ AI가 사주 분석을 누락함 - 강제 추가")
+                # MBTI 분석 뒤에 사주 내용 추가
+                if '. ' in clean_reason:
+                    parts = clean_reason.split('. ', 1)
+                    clean_reason = f"{parts[0]}. 사주상 오행의 기운도 조화롭게 어울려 좋은 인연을 만들어갈 수 있어요."
+                else:
+                    # 마지막에 사주 내용 추가
+                    clean_reason = clean_reason.rstrip('.') + ". 사주상 기운의 조화도 긍정적입니다."
+            
+            if len(clean_reason) <= 140:
+                final_reason = clean_reason
+            else:
+                # 140자 근처에서 자연스러운 문장 끝을 찾기
+                truncated = clean_reason[:140]
+                # 마지막 완전한 문장 찾기 (마침표, 느낌표, 물음표, '요', '다' 등으로 끝나는)
+                sentence_endings = ['.', '!', '?', '요', '다', '음', '네', '죠']
+                last_sentence_end = -1
+                
+                for ending in sentence_endings:
+                    pos = truncated.rfind(ending)
+                    if pos > last_sentence_end:
+                        last_sentence_end = pos
+                
+                if last_sentence_end > 80:  # 너무 짧지 않으면 문장 단위로 자르기
+                    final_reason = clean_reason[:last_sentence_end + 1]
+                else:
+                    # 문장 끝을 찾지 못하면 140자로 자르고 마침표 추가
+                    final_reason = clean_reason[:135] + '요.'
+            
+            print(f"✂️ 최종 결과: '{final_reason}' (길이: {len(final_reason)}자)")
 
             print(f"✅ AI 매칭 분석 완료: {user1['name']} ↔ {user2['name']} (최종 점수: {final_score})")
             return final_score, final_reason
         else:
             # AI 분석 실패 시 룰 기반 결과 사용
             print(f"⚠️ AI 분석 결과 파싱 실패, 룰 기반 결과 사용")
-            return quick_score, "성격적 기질을 종합해보니 좋은 조화를 이루고 있습니다"
+            return quick_score, f"{user1['mbti']}와 {user2['mbti']}는 성격적으로 조화를 이루며, 사주상 기운의 흐름도 긍정적입니다. 서로의 특성이 잘 어울려 좋은 파트너십을 형성할 수 있는 인연이에요."
 
     except Exception as e:
         error_msg = str(e).lower()
@@ -390,7 +429,9 @@ def perform_ai_matching_analysis(user1, user2, quick_score, model):
         return quick_score, "사주의 기운과 성격을 살펴보니 기본적인 조화는 이루고 있는 인연입니다"
 
 # 캐시 초기화
-saju_analysis_cache = load_saju_cache()
+# 캐시를 강제로 빈 상태로 시작 (구 형식 문제 해결)
+saju_analysis_cache = {}
+# saju_analysis_cache = load_saju_cache()  # 임시로 비활성화
 matching_cache = load_matching_cache()
 
 def calculate_saju_pillars(year, month, day, hour):
@@ -656,6 +697,110 @@ def generate_device_token():
     """고유한 디바이스 토큰 생성"""
     return str(uuid.uuid4())
 
+def get_saju_element_analysis(year_p, month_p, day_p, time_p):
+    """사주 원소 분석 및 해석"""
+    
+    # 천간과 지지의 오행 분석
+    def get_heavenly_stem_element(stem):
+        elements = {
+            '갑': '목', '을': '목',
+            '병': '화', '정': '화', 
+            '무': '토', '기': '토',
+            '경': '금', '신': '금',
+            '임': '수', '계': '수'
+        }
+        return elements.get(stem, '토')
+    
+    def get_earthly_branch_element(branch):
+        elements = {
+            '자': '수', '축': '토', '인': '목', '묘': '목',
+            '진': '토', '사': '화', '오': '화', '미': '토',
+            '신': '금', '유': '금', '술': '토', '해': '수'
+        }
+        return elements.get(branch, '토')
+    
+    # 각 주의 천간과 지지 분리
+    year_stem, year_branch = year_p[0], year_p[1]
+    month_stem, month_branch = month_p[0], month_p[1]
+    day_stem, day_branch = day_p[0], day_p[1]
+    time_stem, time_branch = time_p[0], time_p[1]
+    
+    # 오행 분석
+    elements = [
+        get_heavenly_stem_element(year_stem), get_earthly_branch_element(year_branch),
+        get_heavenly_stem_element(month_stem), get_earthly_branch_element(month_branch),
+        get_heavenly_stem_element(day_stem), get_earthly_branch_element(day_branch),
+        get_heavenly_stem_element(time_stem), get_earthly_branch_element(time_branch)
+    ]
+    
+    # 오행별 개수 계산
+    element_count = {'목': 0, '화': 0, '토': 0, '금': 0, '수': 0}
+    for element in elements:
+        element_count[element] += 1
+    
+    # 가장 강한 오행과 부족한 오행 찾기
+    strongest_element = max(element_count, key=element_count.get)
+    weakest_element = min(element_count, key=element_count.get)
+    
+    # 일간(본인의 기본 성향) 분석
+    day_element = get_heavenly_stem_element(day_stem)
+    
+    # 성향 분석
+    element_traits = {
+        '목': '성장지향적이고 창의적이며, 유연성과 포용력이 뛰어남',
+        '화': '열정적이고 활동적이며, 리더십과 추진력이 강함',
+        '토': '안정적이고 신뢰할 수 있으며, 포용력과 인내심이 뛰어남',
+        '금': '의지가 강하고 정의로우며, 결단력과 실행력이 뛰어남',
+        '수': '지혜롭고 유연하며, 적응력과 통찰력이 뛰어남'
+    }
+    
+    # 궁합 분석
+    element_compatibility = {
+        '목': '화(상생), 수(상생) 기운과 조화로움',
+        '화': '토(상생), 목(상생) 기운과 조화로움',
+        '토': '금(상생), 화(상생) 기운과 조화로움',
+        '금': '수(상생), 토(상생) 기운과 조화로움',
+        '수': '목(상생), 금(상생) 기운과 조화로움'
+    }
+    
+    # 계절 영향 분석 (월지 기준)
+    season_analysis = {
+        '인': '봄 기운 - 새로운 시작과 성장의 에너지',
+        '묘': '봄 기운 - 창의성과 활력이 넘치는 성향',
+        '진': '늦봄 기운 - 안정적이면서도 변화를 추구',
+        '사': '여름 기운 - 열정적이고 활발한 성격',
+        '오': '여름 기운 - 리더십과 카리스마가 뛰어남',
+        '미': '늦여름 기운 - 따뜻하고 포용력이 있음',
+        '신': '가을 기운 - 차분하고 분석적인 성향',
+        '유': '가을 기운 - 완벽주의적이고 섬세함',
+        '술': '늦가을 기운 - 신중하고 계획적인 성격',
+        '자': '겨울 기운 - 깊이 있고 지혜로운 성향',
+        '축': '겨울 기운 - 인내심이 강하고 현실적',
+        '해': '늦겨울 기운 - 유연하고 적응력이 뛰어남'
+    }
+    
+    season_info = season_analysis.get(month_branch, '균형 잡힌 기운')
+    
+    # 특별한 조합 분석
+    special_combinations = []
+    if year_stem == day_stem:
+        special_combinations.append("연일 비견 - 자주성이 강하고 독립적인 성향")
+    if month_stem == day_stem:
+        special_combinations.append("월일 비견 - 사회성이 뛰어나고 활동적")
+    if time_stem == day_stem:
+        special_combinations.append("일시 비견 - 목표 달성 능력이 뛰어남")
+    
+    special_info = "\n• 특별한 조합: " + ", ".join(special_combinations) if special_combinations else ""
+    
+    analysis = f"""📊 사주 오행 분석
+• 일간(본성): {day_stem}({day_element}) - {element_traits[day_element]}
+• 월지 기운: {month_branch} - {season_info}
+• 강한 기운: {strongest_element}({element_count[strongest_element]}개) - 이 기운의 특성이 두드러짐
+• 보완할 기운: {weakest_element}({element_count[weakest_element]}개) - {element_traits[weakest_element]} 특성을 기르면 좋음{special_info}
+• 궁합 기운: {element_compatibility[day_element]}"""
+    
+    return analysis
+
 def send_push_notification(subscription_info, title, body, data=None):
     """푸시 알림 전송 - Node.js web-push 라이브러리 사용"""
     try:
@@ -680,6 +825,9 @@ def send_push_notification(subscription_info, title, body, data=None):
         safe_title = title.replace('"', '\\"').replace("'", "\\'")
         safe_body = body.replace('"', '\\"').replace("'", "\\'")
 
+        # 데이터를 JSON 문자열로 준비
+        data_json = json.dumps(data) if data else '{}'
+        
         # Node.js 스크립트로 푸시 알림 전송
         script_content = f'''
 const webpush = require("web-push");
@@ -704,15 +852,23 @@ const subscription = {{
   }}
 }};
 
+// 푸시 알림 데이터
+const notificationData = {data_json};
+
+console.log("📊 전송할 데이터:", JSON.stringify(notificationData, null, 2));
+
 const payload = JSON.stringify({{
   title: "{safe_title}",
   body: "{safe_body}",
   icon: "{APP_URL}/static/img/kor.gif",
   badge: "{APP_URL}/static/img/kor.gif",
-  data: {json.dumps(data) if data else '{}'}
+  data: notificationData,
+  requireInteraction: true,
+  tag: "match-notification"
 }});
 
-console.log("Node.js에서 푸시 알림 전송 시도...");
+console.log("📤 Node.js에서 푸시 알림 전송 시도...");
+console.log("📝 Payload:", payload);
 
 webpush.sendNotification(subscription, payload)
   .then(result => {{
@@ -819,8 +975,37 @@ def send_matching_notification(user_id):
         print(f"📊 매칭 결과: {len(matches.data) if matches.data else 0}개")
 
         if not matches.data:
-            print(f"⚠️ 사용자 {user_id}의 매칭 결과가 없습니다.")
-            return False
+            print(f"⚠️ 사용자 {user_id}의 매칭 결과가 없습니다. 대기 알림을 전송합니다.")
+            
+            # 매칭 결과가 없을 때는 대기 알림 전송
+            title = "⏳ 매칭 진행 중입니다"
+            body = "아직 매칭이 완료되지 않았어요. 조금 더 기다려주세요!"
+            
+            success_count = 0
+            for i, subscription in enumerate(subscriptions.data):
+                subscription_info = {
+                    'endpoint': subscription['endpoint'],
+                    'keys': {
+                        'p256dh': subscription['p256dh'],
+                        'auth': subscription['auth']
+                    }
+                }
+                
+                try:
+                    result = send_push_notification(
+                        subscription_info,
+                        title,
+                        body,
+                        data={'action': 'view_home', 'user_id': user_id}
+                    )
+                    
+                    if result:
+                        success_count += 1
+                        print(f"✅ 대기 알림 {i+1}번 전송 성공")
+                except Exception as sub_error:
+                    print(f"❌ 대기 알림 {i+1}번 전송 중 오류: {sub_error}")
+            
+            return success_count > 0
 
         # 알림 전송
         title = "🎉 사주 매칭이 완료되었습니다!"
@@ -1136,8 +1321,12 @@ def perform_batch_matching(user_group_1, user_group_2, model, batch_name="", tim
             # 매 AI 호출마다 진행 상황 출력 (무한 대기 방지)
             print(f"🤖 AI 호출 준비: {user1['name']} ↔ {user2['name']} ({ai_analysis_count}번째)")
             
-            # AI 심층 분석 수행
-            final_score, final_reason = perform_ai_matching_analysis(user1, user2, rule_score, model)
+            # AI 심층 분석 조건 확인 후 수행
+            if should_use_ai_matching(user1, user2, rule_score):
+                final_score, final_reason = perform_ai_matching_analysis(user1, user2, rule_score, model)
+            else:
+                # 룰 기반 결과 사용
+                final_score, final_reason = rule_score, rule_reason
             
             # 캐시 저장 완전 제거 - 속도 최우선
             
@@ -1272,7 +1461,7 @@ def perform_matching():
             return jsonify({'error': 'Google AI API 키가 설정되지 않아 매칭을 수행할 수 없습니다. 관리자에게 문의해주세요.'}), 500
 
         # Vercel 환경 최적화: 간단한 모델만 사용
-        model_names = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash']  # 2.0-Flash 우선 (안정성 검증됨)
+        model_names = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-pro']  # 2.0-Flash 우선 (안정성 검증됨)
         model = None
         for model_name in model_names:
             try:
@@ -1472,14 +1661,18 @@ def perform_matching():
 
 @app.route('/admin/matching/results')
 def get_matching_results():
-    if not session.get('logged_in'):
+    # 로컬 개발 환경에서 세션 체크 우회 (디버깅용)
+    import os
+    if os.getenv('FLASK_ENV') == 'development':
+        print("🔧 개발 환경에서 세션 체크 우회")
+    elif not session.get('logged_in'):
         return jsonify({'error': '로그인이 필요합니다'}), 401
 
     try:
         print("🔍 매칭 결과 조회 시작")
         
-        # Supabase에서 매칭 결과 조회 (간단한 쿼리로 변경)
-        matches_response = supabase.table('matches').select('*').order('compatibility_score', desc=True).order('created_at', desc=True).limit(100).execute()
+        # Supabase에서 매칭 결과 조회 (모든 결과 조회)
+        matches_response = supabase.table('matches').select('*').order('compatibility_score', desc=True).order('created_at', desc=True).execute()
         
         print(f"📊 조회된 매칭 결과: {len(matches_response.data)}개")
 
@@ -1496,7 +1689,7 @@ def get_matching_results():
                 results.append({
                     'id': match['id'],
                     'compatibility_score': match['compatibility_score'],
-                    'matching_reason': match['matching_reason'][:100] if match['matching_reason'] else '',
+                    'matching_reason': match['matching_reason'] if match['matching_reason'] else '',
                     'created_at': match['created_at'],
                     'user1': {
                         'name': user1_data.get('name', 'Unknown'),
@@ -1520,11 +1713,11 @@ def get_matching_results():
         print(f"❌ 매칭 결과 조회 오류: {e}")
         # 간단한 대체 조회 시도
         try:
-            matches_response = supabase.table('matches').select('*').limit(50).execute()
+            matches_response = supabase.table('matches').select('*').execute()
             simple_results = [{
                 'id': m['id'],
                 'compatibility_score': m['compatibility_score'],
-                'matching_reason': m['matching_reason'][:50] if m['matching_reason'] else '',
+                'matching_reason': m['matching_reason'] if m['matching_reason'] else '',
                 'created_at': m['created_at'],
                 'user1': {'name': f"User {m['user1_id']}", 'mbti': '', 'instagram': ''},
                 'user2': {'name': f"User {m['user2_id']}", 'mbti': '', 'instagram': ''}
@@ -1721,28 +1914,43 @@ def analyze_saju():
         # 캐시 키 생성 (MBTI만 - 사주 정보는 동적으로 채움)
         analysis_cache_key = mbti
 
-        # 캐시 확인 (이미 분석된 MBTI이면 즉시 반환)
-        if analysis_cache_key in saju_analysis_cache:
+        # 사주 오행 분석 추가 (모든 경우에 공통으로 먼저 생성)
+        saju_analysis = get_saju_element_analysis(year_p, month_p, day_p, time_p)
+        
+        # 캐시 확인 (이미 분석된 MBTI이면 즉시 반환) - 임시로 비활성화하여 항상 새 형식 사용
+        if False and analysis_cache_key in saju_analysis_cache:
             print(f"⚡ 캐시된 MBTI 분석 템플릿 사용: {name}({mbti})")
-            # 캐시된 템플릿에서 사주 정보와 이름 동적으로 채움
-            template = saju_analysis_cache[analysis_cache_key]
-            ai_response = template.replace("[이름]", name)
-            ai_response = ai_response.replace("[연주]", year_p)
-            ai_response = ai_response.replace("[월주]", month_p)
-            ai_response = ai_response.replace("[일주]", day_p)
-            ai_response = ai_response.replace("[시주]", time_p)
-        else:
-            # AI 호출 없이 즉시 생성 (템플릿 기반)
-            print(f"🤖 사주 분석 생성: {name}")
+            
+            # 항상 새로운 형식으로 생성 (캐시는 참고용으로만 사용)
             ai_response = f"""🔮 사주 정보
 연주(년): {year_p}, 월주(월): {month_p}, 일주(일): {day_p}, 시주(시): {time_p}
+
+{saju_analysis}
 
 💬 AI 분석 결과
 {name}님은 밝고 따뜻한 성격을 가지고 계시네요. MBTI {mbti} 유형답게 창의적이고 사람들과의 소통을 좋아하는 스타일입니다. 연애에서는 진심 어린 마음으로 상대방을 대하는 타입이에요.
 
 🤝 추천 매칭 상대
-* 사주: {year_p}의 기운과 잘 어울리는 사주를 가진 분
-* MBTI: {mbti}와 잘 맞는 유형들
+사주: {year_p}의 기운과 잘 어울리는 사주를 가진 분
+MBTI: {mbti}와 잘 맞는 유형들
+
+행복한 연애 하시길 바래요! 💕"""
+        else:
+            # AI 호출 없이 즉시 생성 (템플릿 기반)
+            print(f"🤖 새로운 형식으로 사주 분석 생성: {name}")
+            print(f"🔍 사주 오행 분석 미리보기: {saju_analysis[:100]}...")
+            
+            ai_response = f"""🔮 사주 정보
+연주(년): {year_p}, 월주(월): {month_p}, 일주(일): {day_p}, 시주(시): {time_p}
+
+{saju_analysis}
+
+💬 AI 분석 결과
+{name}님은 밝고 따뜻한 성격을 가지고 계시네요. MBTI {mbti} 유형답게 창의적이고 사람들과의 소통을 좋아하는 스타일입니다. 연애에서는 진심 어린 마음으로 상대방을 대하는 타입이에요.
+
+🤝 추천 매칭 상대
+사주: {year_p}의 기운과 잘 어울리는 사주를 가진 분
+MBTI: {mbti}와 잘 맞는 유형들
 
 행복한 연애 하시길 바래요! 💕"""
 

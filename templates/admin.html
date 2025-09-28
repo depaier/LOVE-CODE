@@ -55,6 +55,7 @@
         font-size: 2em;
         font-weight: bold;
         color: #a84448;
+        transition: transform 0.3s ease, color 0.3s ease;
       }
 
       .stat-label {
@@ -181,6 +182,16 @@
         padding: 40px;
         color: #666;
         font-size: 1.2em;
+      }
+
+      /* 로딩 스피너 애니메이션 */
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
       }
 
       @media (max-width: 768px) {
@@ -355,6 +366,42 @@
         <div style="font-size: 1.2em; color: #5a3a22; margin-bottom: 10px">
           🔮 AI가 사주와 MBTI를 분석하여 최적의 매칭을 찾고 있습니다...
         </div>
+
+        <!-- 진행률 바 -->
+        <div
+          style="
+            background-color: #f3f3f3;
+            border-radius: 10px;
+            height: 20px;
+            margin: 15px auto;
+            width: 300px;
+            max-width: 80%;
+          "
+        >
+          <div
+            id="progress-bar"
+            style="
+              background: linear-gradient(90deg, #ff6b6b, #ff8e8e);
+              height: 100%;
+              border-radius: 10px;
+              width: 0%;
+              transition: width 0.3s ease;
+            "
+          ></div>
+        </div>
+
+        <!-- 진행 정보 -->
+        <div
+          id="progress-info"
+          style="margin: 10px 0; font-size: 1em; color: #8a6d59"
+        >
+          <div id="progress-text">매칭 준비 중...</div>
+          <div id="time-estimate" style="margin-top: 5px; font-size: 0.9em">
+            예상 소요 시간 계산 중...
+          </div>
+        </div>
+
+        <!-- 로딩 스피너 -->
         <div
           style="
             border: 3px solid #f3f3f3;
@@ -441,7 +488,7 @@
 
     <!-- 매칭 결과 모달 -->
     <div id="matches-modal" class="modal">
-      <div class="modal-content" style="max-width: 800px">
+      <div class="modal-content" style="max-width: 900px; max-height: 90vh">
         <span class="close" onclick="closeMatchesModal()">&times;</span>
         <h2 style="color: #5a3a22; margin-bottom: 20px; text-align: center">
           💑 AI 매칭 결과
@@ -628,6 +675,9 @@
       async function startMatching() {
         const btn = document.getElementById("matching-btn");
         const progressDiv = document.getElementById("matching-progress");
+        const progressBar = document.getElementById("progress-bar");
+        const progressText = document.getElementById("progress-text");
+        const timeEstimate = document.getElementById("time-estimate");
 
         if (
           confirm(
@@ -639,6 +689,85 @@
           btn.textContent = "🔄 매칭 진행 중...";
           progressDiv.style.display = "block";
 
+          // 진행률 시뮬레이션 변수들
+          let progress = 0;
+          let startTime = Date.now();
+          let totalUsers = {{ results|length }};
+
+          // 실제 매칭 로직 기반 시간 계산
+          let femaleCount = {{ results|selectattr("gender", "equalto", "female")|list|length }};
+          let maleCount = {{ results|selectattr("gender", "equalto", "male")|list|length }};
+
+          // 각 사용자마다 상위 3명과 AI 분석 (실제 로직)
+          let totalAIAnalyses = Math.min(totalUsers * 3, femaleCount * maleCount);
+
+          // AI 분석 시간 계산:
+          // - AI 호출 전 딜레이: 0.3초
+          // - AI 호출 자체: 평균 3-5초 (최대 10초 타임아웃)
+          // - 5번마다 휴식: 1초
+          // - 기타 처리 시간: 0.2초
+          let avgAITime = 4.0; // AI 호출 평균 시간
+          let restTime = Math.floor(totalAIAnalyses / 5) * 1.0; // 휴식 시간
+          let totalProcessTime = totalAIAnalyses * 0.5; // 기타 처리
+
+          let estimatedTotalTime = Math.max(
+            totalAIAnalyses * avgAITime + restTime + totalProcessTime,
+            60 // 최소 1분
+          );
+
+          // 진행률 업데이트 함수
+          function updateProgress() {
+            if (progress < 90) { // 실제 완료 전까지 90%까지만 표시
+              progress += Math.random() * 5 + 1; // 1-6% 씩 랜덤 증가
+              if (progress > 90) progress = 90;
+
+              progressBar.style.width = progress + "%";
+
+              // 현재 처리 중인 AI 분석 수 계산
+              let currentAnalyses = Math.floor((progress / 100) * totalAIAnalyses);
+              progressText.textContent = `${currentAnalyses}/${totalAIAnalyses} AI 분석 중... (${Math.floor(progress)}%)`;
+
+              // 남은 시간 계산 (더 정확한 공식)
+              let elapsedTime = (Date.now() - startTime) / 1000;
+              let estimatedRemaining;
+
+              if (progress > 5) {
+                // 실제 진행률 기반 계산
+                estimatedRemaining = ((100 - progress) / progress) * elapsedTime;
+              } else {
+                // 초기에는 예상 시간 사용
+                estimatedRemaining = estimatedTotalTime;
+              }
+
+              // 최대 예상 시간 제한
+              if (estimatedRemaining > estimatedTotalTime) {
+                estimatedRemaining = estimatedTotalTime - elapsedTime;
+              }
+
+              if (estimatedRemaining > 60) {
+                timeEstimate.textContent = `예상 남은 시간: 약 ${Math.ceil(estimatedRemaining / 60)}분`;
+              } else if (estimatedRemaining > 0) {
+                timeEstimate.textContent = `예상 남은 시간: 약 ${Math.ceil(estimatedRemaining)}초`;
+              } else {
+                timeEstimate.textContent = `거의 완료되었습니다...`;
+              }
+
+              // 1-3초 후 다시 업데이트
+              setTimeout(updateProgress, Math.random() * 2000 + 1000);
+            }
+          }
+
+          // 초기 예상 시간 표시
+          if (estimatedTotalTime > 60) {
+            timeEstimate.textContent = `예상 소요 시간: 약 ${Math.ceil(estimatedTotalTime / 60)}분 (${totalAIAnalyses}회 AI 분석)`;
+          } else {
+            timeEstimate.textContent = `예상 소요 시간: 약 ${Math.ceil(estimatedTotalTime)}초 (${totalAIAnalyses}회 AI 분석)`;
+          }
+          progressText.textContent = `매칭 준비 중... (총 ${totalUsers}명: 여자 ${femaleCount}명, 남자 ${maleCount}명)`;
+
+          // 진행률 업데이트 시작
+          setTimeout(updateProgress, 1000);
+
           try {
             const response = await fetch("/admin/matching", {
               method: "POST",
@@ -647,9 +776,21 @@
 
             const data = await response.json();
 
+            // 완료 시 진행률을 100%로 설정
+            progressBar.style.width = "100%";
+            progressText.textContent = `AI 분석 완료! (총 ${totalAIAnalyses}회 분석)`;
+            let finalElapsed = (Date.now() - startTime) / 1000;
+            if (finalElapsed > 60) {
+              timeEstimate.textContent = `실제 소요 시간: ${Math.floor(finalElapsed / 60)}분 ${Math.floor(finalElapsed % 60)}초`;
+            } else {
+              timeEstimate.textContent = `실제 소요 시간: ${Math.floor(finalElapsed)}초`;
+            }
+
             if (response.ok) {
-              alert(data.message);
-              updateMatchesCount(); // 매칭 결과 수 업데이트
+              setTimeout(() => {
+                alert(data.message);
+                updateMatchesCount(); // 매칭 결과 수 업데이트
+              }, 500);
             } else {
               alert("매칭 중 오류가 발생했습니다: " + data.error);
             }
@@ -657,9 +798,16 @@
             alert("매칭 요청 중 오류가 발생했습니다: " + error.message);
           } finally {
             // 버튼 복원 및 진행 표시 숨김
-            btn.disabled = false;
-            btn.textContent = "💕 AI 매칭 시작하기";
-            progressDiv.style.display = "none";
+            setTimeout(() => {
+              btn.disabled = false;
+              btn.textContent = "💕 AI 매칭 시작하기";
+              progressDiv.style.display = "none";
+
+              // 진행률 초기화
+              progressBar.style.width = "0%";
+              progressText.textContent = "매칭 준비 중...";
+              timeEstimate.textContent = "예상 소요 시간 계산 중...";
+            }, 1500);
           }
         }
       }
@@ -682,8 +830,16 @@
         }
       }
 
-      // 매칭 결과 표시 함수
+      // 페이지네이션 변수들
+      let allMatches = [];
+      let currentPage = 1;
+      const matchesPerPage = 50;
+
+      // 매칭 결과 표시 함수 (페이지네이션 포함)
       function displayMatches(matches) {
+        allMatches = matches;
+        currentPage = 1;
+
         const modal = document.getElementById("matches-modal");
         const content = document.getElementById("matches-content");
 
@@ -691,62 +847,152 @@
           content.innerHTML =
             '<div style="text-align: center; padding: 40px; color: #666;">💔 아직 매칭 결과가 없습니다. 먼저 AI 매칭을 실행해주세요.</div>';
         } else {
-          let html = '<div style="max-height: 70vh; overflow-y: auto;">';
-
-          matches.forEach((match, index) => {
-            const scoreColor =
-              match.compatibility_score >= 80
-                ? "#ff6b6b"
-                : match.compatibility_score >= 60
-                ? "#ffa726"
-                : match.compatibility_score >= 40
-                ? "#4ecdc4"
-                : "#666";
-
-            html += `
-              <div style="border: 2px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-bottom: 15px; background-color: #fafafa;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                  <div style="font-size: 1.1em; font-weight: bold; color: #5a3a22;">
-                    ${match.user1.name} 💕 ${match.user2.name}
-                  </div>
-                  <div style="font-size: 1.2em; font-weight: bold; color: ${scoreColor};">
-                    호환성: ${match.compatibility_score}점
-                  </div>
-                </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                  <div style="flex: 1;">
-                    <strong>${match.user1.name}</strong> (${match.user1.mbti})
-                    ${
-                      match.user1.instagram
-                        ? `<br><small>@${match.user1.instagram}</small>`
-                        : ""
-                    }
-                  </div>
-                  <div style="flex: 1; text-align: right;">
-                    <strong>${match.user2.name}</strong> (${match.user2.mbti})
-                    ${
-                      match.user2.instagram
-                        ? `<br><small>@${match.user2.instagram}</small>`
-                        : ""
-                    }
-                  </div>
-                </div>
-                <div style="background-color: white; padding: 10px; border-radius: 4px; border-left: 3px solid ${scoreColor};">
-                  <strong>매칭 분석:</strong><br>
-                  ${match.matching_reason}
-                </div>
-                <div style="text-align: right; margin-top: 5px;">
-                  <small style="color: #666;">${match.created_at}</small>
-                </div>
-              </div>
-            `;
-          });
-
-          html += "</div>";
-          content.innerHTML = html;
+          updateMatchesPage();
         }
 
         modal.style.display = "block";
+      }
+
+      // 특정 페이지의 매칭 결과 업데이트
+      function updateMatchesPage() {
+        const content = document.getElementById("matches-content");
+        const totalPages = Math.ceil(allMatches.length / matchesPerPage);
+        const startIndex = (currentPage - 1) * matchesPerPage;
+        const endIndex = Math.min(startIndex + matchesPerPage, allMatches.length);
+        const currentMatches = allMatches.slice(startIndex, endIndex);
+
+        let html = `
+          <!-- 페이지네이션 헤더 -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px; background-color: #f8f5f0; border-radius: 8px; border: 2px solid #bda08c;">
+            <div style="font-size: 1.1em; color: #5a3a22; font-weight: bold;">
+              📊 총 ${allMatches.length}개 결과 | ${currentPage}/${totalPages} 페이지 (${startIndex + 1}-${endIndex}번째)
+            </div>
+            <div>
+              <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}
+                style="padding: 8px 12px; margin: 0 5px; border: none; border-radius: 4px; background-color: ${currentPage === 1 ? '#ccc' : '#a84448'}; color: white; cursor: ${currentPage === 1 ? 'not-allowed' : 'pointer'};">
+                ◀ 이전
+              </button>
+              <span style="margin: 0 10px; color: #5a3a22; font-weight: bold;">${currentPage} / ${totalPages}</span>
+              <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}
+                style="padding: 8px 12px; margin: 0 5px; border: none; border-radius: 4px; background-color: ${currentPage === totalPages ? '#ccc' : '#a84448'}; color: white; cursor: ${currentPage === totalPages ? 'not-allowed' : 'pointer'};">
+                다음 ▶
+              </button>
+            </div>
+          </div>
+
+          <!-- 매칭 결과 리스트 -->
+          <div style="max-height: 60vh; overflow-y: auto;">
+        `;
+
+        currentMatches.forEach((match, index) => {
+          const scoreColor =
+            match.compatibility_score >= 80
+              ? "#ff6b6b"
+              : match.compatibility_score >= 60
+              ? "#ffa726"
+              : match.compatibility_score >= 40
+              ? "#4ecdc4"
+              : "#666";
+
+          const globalIndex = startIndex + index + 1;
+
+          html += `
+            <div style="border: 2px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-bottom: 15px; background-color: #fafafa;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="font-size: 1.1em; font-weight: bold; color: #5a3a22;">
+                  <span style="background-color: #bda08c; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.9em; margin-right: 10px;">#${globalIndex}</span>
+                  ${match.user1.name} 💕 ${match.user2.name}
+                </div>
+                <div style="font-size: 1.2em; font-weight: bold; color: ${scoreColor};">
+                  호환성: ${match.compatibility_score}점
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <div style="flex: 1;">
+                  <strong>${match.user1.name}</strong> (${match.user1.mbti})
+                  ${
+                    match.user1.instagram
+                      ? `<br><small>@${match.user1.instagram}</small>`
+                      : ""
+                  }
+                </div>
+                <div style="flex: 1; text-align: right;">
+                  <strong>${match.user2.name}</strong> (${match.user2.mbti})
+                  ${
+                    match.user2.instagram
+                      ? `<br><small>@${match.user2.instagram}</small>`
+                      : ""
+                  }
+                </div>
+              </div>
+              <div style="background-color: white; padding: 10px; border-radius: 4px; border-left: 3px solid ${scoreColor};">
+                <strong>매칭 분석:</strong><br>
+                ${match.matching_reason}
+              </div>
+              <div style="text-align: right; margin-top: 5px;">
+                <small style="color: #666;">${match.created_at}</small>
+              </div>
+            </div>
+          `;
+        });
+
+        html += `
+          </div>
+
+          <!-- 페이지네이션 푸터 -->
+          <div style="display: flex; justify-content: center; align-items: center; margin-top: 20px; padding: 15px; background-color: #f8f5f0; border-radius: 8px; border: 2px solid #bda08c;">
+            <button onclick="changePage(1)" ${currentPage === 1 ? 'disabled' : ''}
+              style="padding: 8px 12px; margin: 0 5px; border: none; border-radius: 4px; background-color: ${currentPage === 1 ? '#ccc' : '#8a6d59'}; color: white; cursor: ${currentPage === 1 ? 'not-allowed' : 'pointer'};">
+              첫 페이지
+            </button>
+            <button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}
+              style="padding: 8px 12px; margin: 0 5px; border: none; border-radius: 4px; background-color: ${currentPage === 1 ? '#ccc' : '#a84448'}; color: white; cursor: ${currentPage === 1 ? 'not-allowed' : 'pointer'};">
+              ◀ 이전
+            </button>
+
+            <div style="margin: 0 15px;">
+              <select onchange="changePage(parseInt(this.value))" style="padding: 8px; border: 2px solid #bda08c; border-radius: 4px; font-family: 'BM Hanna Pro', cursive;">
+        `;
+
+        for (let i = 1; i <= totalPages; i++) {
+          html += `<option value="${i}" ${i === currentPage ? 'selected' : ''}>${i}페이지</option>`;
+        }
+
+        html += `
+              </select>
+            </div>
+
+            <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}
+              style="padding: 8px 12px; margin: 0 5px; border: none; border-radius: 4px; background-color: ${currentPage === totalPages ? '#ccc' : '#a84448'}; color: white; cursor: ${currentPage === totalPages ? 'not-allowed' : 'pointer'};">
+              다음 ▶
+            </button>
+            <button onclick="changePage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}
+              style="padding: 8px 12px; margin: 0 5px; border: none; border-radius: 4px; background-color: ${currentPage === totalPages ? '#ccc' : '#8a6d59'}; color: white; cursor: ${currentPage === totalPages ? 'not-allowed' : 'pointer'};">
+              마지막 페이지
+            </button>
+          </div>
+
+          <!-- 키보드 단축키 안내 -->
+          <div style="text-align: center; margin-top: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 4px; font-size: 0.9em; color: #666;">
+            ⌨️ <strong>키보드 단축키:</strong> ← 이전 페이지 | → 다음 페이지 | Home 첫 페이지 | End 마지막 페이지 | ESC 닫기
+          </div>
+        `;
+
+        content.innerHTML = html;
+      }
+
+      // 페이지 변경 함수
+      function changePage(newPage) {
+        const totalPages = Math.ceil(allMatches.length / matchesPerPage);
+
+        if (newPage >= 1 && newPage <= totalPages) {
+          currentPage = newPage;
+          updateMatchesPage();
+
+          // 맨 위로 스크롤
+          const content = document.getElementById("matches-content");
+          content.scrollTop = 0;
+        }
       }
 
       // 매칭 모달 닫기 함수
@@ -757,14 +1003,34 @@
       // 매칭 결과 수 업데이트 함수
       async function updateMatchesCount() {
         try {
+          const matchesCountElement = document.getElementById("matches-count");
+
+          // 로딩 상태 표시
+          matchesCountElement.textContent = "로딩...";
+          matchesCountElement.style.color = "#8a6d59";
+
           const response = await fetch("/admin/matching/results");
           const data = await response.json();
+
           if (response.ok) {
-            document.getElementById("matches-count").textContent =
-              data.matches.length;
+            matchesCountElement.textContent = data.matches.length;
+            matchesCountElement.style.color = "#a84448";
+
+            // 성공 애니메이션
+            matchesCountElement.style.transform = "scale(1.1)";
+            setTimeout(() => {
+              matchesCountElement.style.transform = "scale(1)";
+            }, 300);
+
+            console.log(`✅ 매칭 결과 수 업데이트 완료: ${data.matches.length}개`);
+          } else {
+            matchesCountElement.textContent = "오류";
+            matchesCountElement.style.color = "#ff6b6b";
           }
         } catch (error) {
           console.error("매칭 수 업데이트 중 오류:", error);
+          document.getElementById("matches-count").textContent = "오류";
+          document.getElementById("matches-count").style.color = "#ff6b6b";
         }
       }
 
@@ -787,12 +1053,32 @@
         }
       });
 
-      // ESC 키로 매칭 모달 닫기
+      // 키보드 단축키 (ESC, 좌우 화살표)
       document.addEventListener("keydown", function (event) {
+        const modal = document.getElementById("matches-modal");
+
         if (event.key === "Escape") {
-          const modal = document.getElementById("matches-modal");
           if (modal.style.display === "block") {
             modal.style.display = "none";
+          }
+        }
+
+        // 매칭 결과 모달이 열려있을 때만 페이지네이션 단축키 작동
+        if (modal.style.display === "block" && allMatches.length > 0) {
+          const totalPages = Math.ceil(allMatches.length / matchesPerPage);
+
+          if (event.key === "ArrowLeft" && currentPage > 1) {
+            event.preventDefault();
+            changePage(currentPage - 1);
+          } else if (event.key === "ArrowRight" && currentPage < totalPages) {
+            event.preventDefault();
+            changePage(currentPage + 1);
+          } else if (event.key === "Home") {
+            event.preventDefault();
+            changePage(1);
+          } else if (event.key === "End") {
+            event.preventDefault();
+            changePage(totalPages);
           }
         }
       });
@@ -802,6 +1088,18 @@
         calculateTodayStats();
         updateMatchesCount();
       });
+
+      // Service Worker 메시지 수신 처리 (알림 클릭 시 페이지 이동)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', function(event) {
+          console.log('📨 Service Worker 메시지 수신:', event.data);
+
+          if (event.data && event.data.type === 'NAVIGATE' && event.data.url) {
+            console.log(`🔄 페이지 이동: ${window.location.href} → ${event.data.url}`);
+            window.location.href = event.data.url;
+          }
+        });
+      }
     </script>
   </body>
 </html>
