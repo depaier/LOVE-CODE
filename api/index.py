@@ -1793,6 +1793,11 @@ def push_settings():
     """푸시 알림 설정 페이지"""
     return render_template('push_settings.html')
 
+@app.route('/push-test')
+def push_test():
+    """푸시 알림 테스트 페이지"""
+    return render_template('push_test.html')
+
 @app.route('/api/push/test', methods=['POST'])
 def send_test_notification():
     """테스트 푸시 알림 전송"""
