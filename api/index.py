@@ -3,7 +3,7 @@ import google.generativeai as genai
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
-# from pywebpush import webpush  # 제거됨
+from pywebpush import webpush
 import json
 import uuid
 import re
@@ -802,133 +802,73 @@ def get_saju_element_analysis(year_p, month_p, day_p, time_p):
     return analysis
 
 def send_push_notification(subscription_info, title, body, data=None):
-    """푸시 알림 전송 - Node.js web-push 라이브러리 사용"""
+    """푸시 알림 전송 - Python pywebpush 라이브러리 사용"""
     try:
-        import subprocess
-        import json
-        import os
-        import tempfile
-
+        print(f"🔔 푸시 알림 전송 시도: {title}")
+        print(f"📄 Body: {body}")
+        
+        # 환경변수에서 VAPID 키 가져오기
+        VAPID_EMAIL = os.getenv('VAPID_EMAIL')
+        VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY')
+        VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY')
+        APP_URL = os.getenv('APP_URL', 'https://saju-matching.vercel.app')
+        
+        if not all([VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY]):
+            print("❌ VAPID 키가 설정되지 않았습니다.")
+            print(f"Email: {bool(VAPID_EMAIL)}, Public: {bool(VAPID_PUBLIC_KEY)}, Private: {bool(VAPID_PRIVATE_KEY)}")
+            return False
+        
+        print(f"🔑 VAPID 이메일: {VAPID_EMAIL}")
+        print(f"🔑 VAPID 공개키: {VAPID_PUBLIC_KEY[:20]}...")
+        
+        # 구독 정보 검증
         endpoint = subscription_info.get('endpoint', '')
         p256dh = subscription_info.get('keys', {}).get('p256dh', '')
         auth = subscription_info.get('keys', {}).get('auth', '')
 
         if not all([endpoint, p256dh, auth]):
             print("❌ 구독 정보가 불완전합니다")
+            print(f"Endpoint: {bool(endpoint)}, p256dh: {bool(p256dh)}, auth: {bool(auth)}")
             return False
 
         print(f"📤 푸시 알림 전송 시도: {endpoint[:50]}...")
-        print(f"📝 제목: {title}")
-        print(f"📝 내용: {body}")
-
-        # 안전한 문자열로 변환 (쉘 인젝션 방지)
-        safe_title = title.replace('"', '\\"').replace("'", "\\'")
-        safe_body = body.replace('"', '\\"').replace("'", "\\'")
-
-        # 데이터를 JSON 문자열로 준비
-        data_json = json.dumps(data) if data else '{}'
         
-        # Node.js 스크립트로 푸시 알림 전송
-        script_content = f'''
-const webpush = require("web-push");
-
-// VAPID 키 직접 설정 (Python에서 전달받음)
-const vapidEmail = "{VAPID_EMAIL}";
-const vapidPublicKey = "{VAPID_PUBLIC_KEY}";
-const vapidPrivateKey = "{VAPID_PRIVATE_KEY}";
-
-// VAPID 키 설정
-webpush.setVapidDetails(
-  vapidEmail.startsWith('mailto:') ? vapidEmail : `mailto:${{vapidEmail}}`,
-  vapidPublicKey,
-  vapidPrivateKey
-);
-
-const subscription = {{
-  endpoint: "{endpoint}",
-  keys: {{
-    p256dh: "{p256dh}",
-    auth: "{auth}"
-  }}
-}};
-
-// 푸시 알림 데이터
-const notificationData = {data_json};
-
-console.log("📊 전송할 데이터:", JSON.stringify(notificationData, null, 2));
-
-const payload = JSON.stringify({{
-  title: "{safe_title}",
-  body: "{safe_body}",
-  icon: "{APP_URL}/static/img/kor.gif",
-  badge: "{APP_URL}/static/img/kor.gif",
-  data: notificationData,
-  requireInteraction: true,
-  tag: "match-notification"
-}});
-
-console.log("📤 Node.js에서 푸시 알림 전송 시도...");
-console.log("📝 Payload:", payload);
-
-webpush.sendNotification(subscription, payload)
-  .then(result => {{
-    console.log("✅ 푸시 알림 전송 성공");
-    process.exit(0);
-  }})
-  .catch(err => {{
-    console.error("❌ 푸시 알림 전송 실패:", err.message);
-    console.error("에러 코드:", err.statusCode);
-    process.exit(1);
-  }});
-'''
-
-        # 프로젝트 루트에 임시 파일 생성
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        script_path = os.path.join(project_root, f'push_temp_{os.urandom(8).hex()}.js')
-
-        try:
-            # 임시 파일로 Node.js 스크립트 생성 (프로젝트 루트에)
-            with open(script_path, 'w', encoding='utf-8') as f:
-                f.write(script_content)
-
-            # Node.js 스크립트 실행 (프로젝트 루트에서)
-            env = os.environ.copy()
-            env.update({
-                'VAPID_PRIVATE_KEY': VAPID_PRIVATE_KEY,
-                'VAPID_PUBLIC_KEY': VAPID_PUBLIC_KEY,
-                'VAPID_EMAIL': VAPID_EMAIL,
-                'APP_URL': APP_URL
-            })
-
-            result = subprocess.run(
-                ['node', os.path.basename(script_path)],
-                capture_output=True,
-                text=True,
-                timeout=15,
-                cwd=project_root,  # 프로젝트 루트에서 실행
-                env=env  # 환경변수 전달
-            )
-
-            print("📡 Node.js 출력:")
-            if result.stdout:
-                print(result.stdout.strip())
-            if result.stderr:
-                print("📡 Node.js 오류:")
-                print(result.stderr.strip())
-
-            return result.returncode == 0
-
-        finally:
-            # 임시 파일 삭제
-            try:
-                os.unlink(script_path)
-            except:
-                pass
-
+        # 알림 페이로드 생성
+        payload = json.dumps({
+            "title": title,
+            "body": body,
+            "icon": f"{APP_URL}/static/img/LOVECODE_ICON.png",
+            "badge": f"{APP_URL}/static/img/LOVECODE_ICON.png",
+            "data": data or {},
+            "requireInteraction": True,
+            "tag": "match-notification"
+        })
+        
+        # VAPID 클레임 설정
+        vapid_claims = {
+            "sub": f"mailto:{VAPID_EMAIL}" if not VAPID_EMAIL.startswith('mailto:') else VAPID_EMAIL
+        }
+        
+        print("📤 Python pywebpush로 푸시 알림 전송 시도...")
+        print(f"📝 Payload: {payload}")
+        
+        # 푸시 알림 전송
+        response = webpush(
+            subscription_info=subscription_info,
+            data=payload,
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_claims=vapid_claims,
+            ttl=43200  # 12시간
+        )
+        
+        print(f"✅ 푸시 알림 전송 성공! 응답 코드: {response.status_code}")
+        return True
+        
     except Exception as e:
-        print(f"❌ 푸시 알림 전송 실패: {e}")
+        print(f"❌ 푸시 알림 전송 중 오류: {e}")
+        print(f"오류 타입: {type(e).__name__}")
         import traceback
-        print(f"상세 오류: {traceback.format_exc()}")
+        traceback.print_exc()
         return False
 
 def save_push_subscription(device_token, subscription_data, user_id=None):

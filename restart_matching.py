@@ -16,7 +16,7 @@ def restart_matching():
     try:
         # 1. 서버 상태 확인
         print("📡 서버 연결 확인...")
-        response = requests.get('https://love-code-eta.vercel.app/admin', timeout=5)
+        response = requests.get('https://cbacb040e05b.ngrok-free.app/admin', timeout=5)
         if response.status_code not in [200, 302]:
             print("❌ 서버에 연결할 수 없습니다. 서버를 먼저 시작해주세요.")
             return False
@@ -62,7 +62,7 @@ def check_matching_status():
     while True:
         try:
             # 서버 응답 확인
-            response = requests.get('https://love-code-eta.vercel.app//admin', timeout=5)
+            response = requests.get('https://cbacb040e05b.ngrok-free.app/admin', timeout=5)
             
             if response.status_code == 200:
                 current_time = time.time()
