@@ -113,9 +113,9 @@ self.addEventListener("notificationclick", (event) => {
     source: data.source,
     dataKeys: Object.keys(data || {}),
   });
-  
+
   // 특별히 매칭 알림인 경우 강조 표시
-  if (data.action === 'view_matches') {
+  if (data.action === "view_matches") {
     console.log("🎯🎯🎯 매칭 알림 감지됨! user_id:", data.user_id);
   }
 
@@ -131,9 +131,16 @@ self.addEventListener("notificationclick", (event) => {
   let url = "/";
 
   // 데이터에 따라 다른 URL로 이동
-  if (data.action === "view_matches" && data.user_id) {
-    url = `/matches/${data.user_id}?notification=match_complete`;
-    console.log("🎯 매칭 결과 페이지로 이동:", url);
+  if (data.action === "view_matches") {
+    if (data.user_id && data.user_id !== null && data.user_id !== "null") {
+      url = `/matches/${data.user_id}?notification=match_complete`;
+      console.log("🎯 매칭 결과 페이지로 이동:", url);
+    } else {
+      // user_id가 없거나 null인 경우 홈페이지로 이동 + 경고 메시지
+      url = "/?notification=missing_user_id";
+      console.log("⚠️ user_id가 없어서 홈페이지로 이동:", url);
+      console.log("❌ user_id 값:", data.user_id, typeof data.user_id);
+    }
   } else if (data.action === "view_home") {
     url = "/?notification=waiting";
     console.log("🎯 홈페이지로 이동 (매칭 대기):", url);

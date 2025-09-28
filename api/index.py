@@ -1859,12 +1859,31 @@ def send_test_notification():
             # 실제 매칭 알림과 동일한 데이터 구조
             title = "🎉 사주 매칭이 완료되었습니다!"
             body = "총 3명의 매칭 상대를 찾았어요. 확인해보세요!"
+            
+            # user_id가 없으면 테스트용 ID 사용
+            actual_user_id = subscription.get('user_id')
+            if not actual_user_id:
+                print("⚠️ 구독 정보에 user_id가 없습니다. 테스트용 user_id를 생성합니다.")
+                # 가장 최근 사용자 ID 조회하여 테스트용으로 사용
+                try:
+                    recent_user = supabase.table('results').select('id').order('created_at', desc=True).limit(1).execute()
+                    if recent_user.data:
+                        actual_user_id = recent_user.data[0]['id']
+                        print(f"📋 최근 사용자 ID를 테스트용으로 사용: {actual_user_id}")
+                    else:
+                        actual_user_id = 1  # 기본값
+                        print("📋 기본 테스트 user_id 사용: 1")
+                except Exception as e:
+                    print(f"❌ 사용자 ID 조회 실패: {e}")
+                    actual_user_id = 1
+            
             test_data = {
                 'action': 'view_matches',
-                'user_id': subscription.get('user_id', 1),  # 실제 user_id 사용
+                'user_id': actual_user_id,
                 'source': 'test-matching'
             }
             print(f"🎯 매칭 테스트 데이터: {test_data}")
+            print(f"🎯 user_id 확인: {actual_user_id} (타입: {type(actual_user_id)})")
         else:
             # 기본 테스트
             test_data = {
