@@ -1853,10 +1853,12 @@ def send_test_notification():
         
         print(f"🔧 구독 정보 구성 완료: endpoint={subscription_info['endpoint'][:50]}...")
 
+        # 테스트용 데이터 - 실제 매칭 알림과 동일한 형태로 구성
         test_data = {
-            'action': 'test',
+            'action': 'view_matches',
+            'user_id': 1,  # 테스트용 사용자 ID
             'timestamp': str(datetime.now()),
-            'source': 'vercel-test'
+            'source': 'test'
         }
 
         print(f"📤 푸시 알림 전송 시도: {title}")

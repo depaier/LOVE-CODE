@@ -188,12 +188,25 @@
         </div>
       </div>
 
-       <div>
-         <button class="btn" id="request-permission">🔔 알림 권한 요청</button>
-         <button class="btn" id="subscribe-push">📝 푸시 구독</button>
-         <button class="btn" id="send-test">🚀 테스트 알림 전송</button>
-         <button class="btn" id="debug-env" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #667eea 100%);">🔍 환경변수 확인</button>
-       </div>
+      <div>
+        <button class="btn" id="request-permission">🔔 알림 권한 요청</button>
+        <button class="btn" id="subscribe-push">📝 푸시 구독</button>
+        <button class="btn" id="send-test">🚀 테스트 알림 전송</button>
+        <button
+          class="btn"
+          id="debug-env"
+          style="
+            background: linear-gradient(
+              135deg,
+              #667eea 0%,
+              #764ba2 50%,
+              #667eea 100%
+            );
+          "
+        >
+          🔍 환경변수 확인
+        </button>
+      </div>
 
       <div class="log-section">
         <h3>📝 로그</h3>
@@ -413,34 +426,42 @@
             const button = document.getElementById("send-test");
             button.disabled = false;
             button.textContent = "🚀 테스트 알림 전송";
-           }
-         });
+          }
+        });
 
-       document
-         .getElementById("debug-env")
-         .addEventListener("click", async () => {
-           try {
-             addLog("🔍 서버 환경변수 확인 중...", "info");
-             
-             const response = await fetch("/api/debug/env");
-             const result = await response.json();
-             
-             if (response.ok) {
-               addLog("📊 서버 환경변수 상태:", "success");
-               addLog(`• VAPID Email: ${result.vapid_email}`, "info");
-               addLog(`• VAPID Public Key: ${result.vapid_public_key}`, "info");
-               addLog(`• VAPID Private Key: ${result.vapid_private_key}`, "info");
-               addLog(`• Supabase URL: ${result.supabase_url}`, "info");
-               addLog(`• pywebpush 라이브러리: ${result.pywebpush_available ? '✅ 사용 가능' : '❌ 사용 불가'}`, "info");
-             } else {
-               addLog(`환경변수 확인 실패: ${result.error}`, "error");
-             }
-           } catch (error) {
-             addLog(`환경변수 확인 중 오류: ${error.message}`, "error");
-           }
-         });
+      document
+        .getElementById("debug-env")
+        .addEventListener("click", async () => {
+          try {
+            addLog("🔍 서버 환경변수 확인 중...", "info");
 
-       // 페이지 로드 시 초기화
+            const response = await fetch("/api/debug/env");
+            const result = await response.json();
+
+            if (response.ok) {
+              addLog("📊 서버 환경변수 상태:", "success");
+              addLog(`• VAPID Email: ${result.vapid_email}`, "info");
+              addLog(`• VAPID Public Key: ${result.vapid_public_key}`, "info");
+              addLog(
+                `• VAPID Private Key: ${result.vapid_private_key}`,
+                "info"
+              );
+              addLog(`• Supabase URL: ${result.supabase_url}`, "info");
+              addLog(
+                `• pywebpush 라이브러리: ${
+                  result.pywebpush_available ? "✅ 사용 가능" : "❌ 사용 불가"
+                }`,
+                "info"
+              );
+            } else {
+              addLog(`환경변수 확인 실패: ${result.error}`, "error");
+            }
+          } catch (error) {
+            addLog(`환경변수 확인 중 오류: ${error.message}`, "error");
+          }
+        });
+
+      // 페이지 로드 시 초기화
       document.addEventListener("DOMContentLoaded", async () => {
         addLog("푸시 알림 테스트 페이지 초기화 시작", "info");
         updateStatus();
