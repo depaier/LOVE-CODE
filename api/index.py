@@ -1124,7 +1124,28 @@ def admin():
         response = supabase.table('results').select('*').order('created_at', desc=True).execute()
         results = response.data
 
-        return render_template('admin.html', results=results)
+        # 매칭이 안된 사용자 수를 성별로 계산
+        unmatched_stats = {
+            'unmatched_female': 0,
+            'unmatched_male': 0,
+            'total_female': 0,
+            'total_male': 0
+        }
+        
+        for result in results:
+            gender = result.get('gender', '').upper()
+            is_matched = result.get('is_matched', False)
+            
+            if gender == 'FEMALE':
+                unmatched_stats['total_female'] += 1
+                if not is_matched:
+                    unmatched_stats['unmatched_female'] += 1
+            elif gender == 'MALE':
+                unmatched_stats['total_male'] += 1
+                if not is_matched:
+                    unmatched_stats['unmatched_male'] += 1
+
+        return render_template('admin.html', results=results, unmatched_stats=unmatched_stats)
     except Exception as e:
         return f"관리자 페이지 로딩 중 오류 발생: {e}"
 

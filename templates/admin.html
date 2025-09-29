@@ -38,7 +38,7 @@
 
       .stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 20px;
         margin-bottom: 30px;
       }
@@ -291,6 +291,18 @@
         <div class="stat-card">
           <div class="stat-number" id="matches-count">0</div>
           <div class="stat-label">매칭 결과 수</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" style="color: #ff6b6b">
+            {{ unmatched_stats.unmatched_female if unmatched_stats else 0 }}
+          </div>
+          <div class="stat-label">미매칭 여자</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" style="color: #4ecdc4">
+            {{ unmatched_stats.unmatched_male if unmatched_stats else 0 }}
+          </div>
+          <div class="stat-label">미매칭 남자</div>
         </div>
       </div>
 
@@ -790,6 +802,7 @@
               setTimeout(() => {
                 alert(data.message);
                 updateMatchesCount(); // 매칭 결과 수 업데이트
+                updateStatistics(); // 미매칭 사용자 통계 업데이트
               }, 500);
             } else {
               alert("매칭 중 오류가 발생했습니다: " + data.error);
@@ -1031,6 +1044,51 @@
           console.error("매칭 수 업데이트 중 오류:", error);
           document.getElementById("matches-count").textContent = "오류";
           document.getElementById("matches-count").style.color = "#ff6b6b";
+        }
+      }
+
+      // 페이지 새로고침 없이 통계 업데이트 함수
+      async function updateStatistics() {
+        try {
+          // 관리자 페이지 데이터 다시 가져오기
+          const response = await fetch("/admin");
+          const html = await response.text();
+
+          // 새로운 HTML에서 통계 데이터 추출
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = html;
+
+          // 미매칭 여자 사용자 수 업데이트
+          const newUnmatchedFemaleElement = tempDiv.querySelector('.stat-card:nth-child(5) .stat-number');
+          if (newUnmatchedFemaleElement) {
+            const currentElement = document.querySelector('.stat-card:nth-child(5) .stat-number');
+            if (currentElement && currentElement.textContent !== newUnmatchedFemaleElement.textContent) {
+              currentElement.textContent = newUnmatchedFemaleElement.textContent;
+              // 업데이트 애니메이션
+              currentElement.style.transform = "scale(1.1)";
+              setTimeout(() => {
+                currentElement.style.transform = "scale(1)";
+              }, 300);
+            }
+          }
+
+          // 미매칭 남자 사용자 수 업데이트
+          const newUnmatchedMaleElement = tempDiv.querySelector('.stat-card:nth-child(6) .stat-number');
+          if (newUnmatchedMaleElement) {
+            const currentElement = document.querySelector('.stat-card:nth-child(6) .stat-number');
+            if (currentElement && currentElement.textContent !== newUnmatchedMaleElement.textContent) {
+              currentElement.textContent = newUnmatchedMaleElement.textContent;
+              // 업데이트 애니메이션
+              currentElement.style.transform = "scale(1.1)";
+              setTimeout(() => {
+                currentElement.style.transform = "scale(1)";
+              }, 300);
+            }
+          }
+
+          console.log("✅ 통계 정보 업데이트 완료");
+        } catch (error) {
+          console.error("통계 업데이트 중 오류:", error);
         }
       }
 
