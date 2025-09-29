@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>푸시 알림 설정 | 사주 매칭 서비스</title>
+    <title>LOVE-CODE - 푸시 알림 설정</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -17,18 +17,42 @@
       rel="stylesheet"
     />
     <style>
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
       body {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
         font-family: "BM Hanna Pro", cursive;
+        background-color: #fdfaf3;
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        color: #3a3a3a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+        box-sizing: border-box;
       }
 
       .card {
-        border: none;
-        border-radius: 20px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        backdrop-filter: blur(10px);
-        background: rgba(255, 255, 255, 0.95);
+        background-color: #ffffff;
+        border: 3px solid #8a6d59;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        border-radius: 4px;
+        animation: fadeIn 0.8s ease-out;
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
       }
 
       .notification-toggle {
@@ -69,7 +93,7 @@
       }
 
       input:checked + .slider {
-        background-color: #2196f3;
+        background-color: #a84448;
       }
 
       input:checked + .slider:before {
@@ -85,49 +109,92 @@
       }
 
       .status-enabled {
-        background-color: #28a745;
+        background-color: #a84448;
       }
 
       .status-disabled {
-        background-color: #dc3545;
+        background-color: #8a6d59;
       }
 
       .status-unknown {
-        background-color: #ffc107;
+        background-color: #bda08c;
       }
 
       .settings-section {
         margin-bottom: 30px;
         padding: 20px;
-        border-radius: 10px;
-        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        background: #fdfaf3;
+        border: 2px solid #bda08c;
       }
 
       .btn-request {
-        background: linear-gradient(45deg, #667eea, #764ba2);
+        background-color: #a84448;
         border: none;
-        border-radius: 10px;
+        border-radius: 4px;
         padding: 12px 30px;
-        color: white;
+        color: #fdfaf3;
+        font-family: "BM Hanna Pro", cursive;
         font-weight: bold;
-        transition: transform 0.2s ease;
+        transition: background-color 0.3s ease;
+        cursor: pointer;
       }
 
       .btn-request:hover {
-        transform: translateY(-2px);
-        color: white;
+        background-color: #8c383b;
+        color: #fdfaf3;
+      }
+
+      h2, h4 {
+        color: #5a3a22;
+        font-family: "BM Hanna Pro", cursive;
+      }
+
+      .text-muted {
+        color: #8a6d59 !important;
+      }
+
+      .alert-info {
+        background-color: #fdfaf3;
+        border: 2px solid #bda08c;
+        border-radius: 4px;
+        color: #5a3a22;
+      }
+
+      .btn-outline-primary {
+        color: #a84448;
+        border-color: #a84448;
+        font-family: "BM Hanna Pro", cursive;
+        border-radius: 4px;
+      }
+
+      .btn-outline-primary:hover {
+        background-color: #a84448;
+        border-color: #a84448;
+        color: #fdfaf3;
+      }
+
+      .btn-outline-secondary {
+        color: #8a6d59;
+        border-color: #8a6d59;
+        font-family: "BM Hanna Pro", cursive;
+        border-radius: 4px;
+      }
+
+      .btn-outline-secondary:hover {
+        background-color: #8a6d59;
+        border-color: #8a6d59;
+        color: #fdfaf3;
       }
     </style>
   </head>
   <body>
-    <div class="container py-5">
-      <div class="row justify-content-center">
-        <div class="col-lg-8">
-          <div class="card p-4">
+    <div class="card p-4">
             <div class="text-center mb-4">
-              <i class="fas fa-bell fa-3x text-primary mb-3"></i>
-              <h2>푸시 알림 설정</h2>
-              <p class="text-muted">매칭 알림을 받아보세요</p>
+              <i class="fas fa-bell fa-3x mb-3" style="color: #a84448;"></i>
+              <h1 style="font-size: 2.5em; margin-bottom: 10px; color: #5a3a22;">LOVE-CODE</h1>
+              <h2 style="font-size: 1.8em; margin-bottom: 20px;">푸시 알림 설정</h2>
+              <p class="text-muted" style="font-size: 1.3em;">매칭 알림을 받아보세요</p>
             </div>
 
             <!-- 브라우저 알림 권한 상태 -->
@@ -222,9 +289,6 @@
                 상태 새로고침
               </button>
             </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -515,9 +579,14 @@
 
       // 토스트 메시지 표시 함수
       function showToast(message, type = "info") {
+        let bgColor = "#a84448";
+        if (type === "success") bgColor = "#a84448";
+        else if (type === "warning") bgColor = "#8a6d59";
+        else if (type === "error") bgColor = "#8a6d59";
+        
         const toastHtml = `
-                <div class="toast align-items-center text-white bg-${type} border-0 position-fixed"
-                     style="top: 20px; right: 20px; z-index: 9999;"
+                <div class="toast align-items-center text-white border-0 position-fixed"
+                     style="top: 20px; right: 20px; z-index: 9999; background-color: ${bgColor}; font-family: 'BM Hanna Pro', cursive;"
                      role="alert">
                     <div class="d-flex">
                         <div class="toast-body">
