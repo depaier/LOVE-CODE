@@ -48,6 +48,17 @@
           transform: rotate(360deg);
         }
       }
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        50% {
+          box-shadow: 0 8px 25px rgba(102, 126, 234, 0.7);
+        }
+        100% {
+          box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+      }
 
       body {
         /* 2. font-family를 'BM Hanna Pro'로 변경 */
@@ -129,6 +140,14 @@
       }
       button:hover {
         background-color: #8c383b;
+      }
+      button.disabled-notification {
+        background-color: #ccc !important;
+        cursor: not-allowed !important;
+        opacity: 0.6;
+      }
+      button.disabled-notification:hover {
+        background-color: #ccc !important;
       }
 
       /* 체크박스 스타일 */
@@ -1249,6 +1268,79 @@
       // 사용자 관리자 인스턴스 생성
       const userManager = new UserManager();
 
+      // 알림 권한 체크 및 폼 필드 가이드 함수
+      function checkNotificationAndGuide() {
+        if (Notification.permission !== "granted") {
+          alert(
+            "🔔 매칭 알림을 받기 위해 먼저 푸시 알림을 허용해주세요!\n\n위의 '푸시 알림 설정' 버튼을 클릭하여 알림을 허용한 후 정보를 입력해주세요."
+          );
+
+          // 푸시 설정 버튼으로 스크롤
+          const pushButton = document.getElementById("push-settings-btn");
+          if (pushButton && pushButton.style.display !== "none") {
+            pushButton.scrollIntoView({ behavior: "smooth", block: "center" });
+            // 버튼 강조 효과
+            pushButton.style.animation = "pulse 1s ease-in-out 3";
+            pushButton.style.transform = "scale(1.05)";
+            setTimeout(() => {
+              pushButton.style.animation = "";
+              pushButton.style.transform = "";
+            }, 3000);
+          }
+          return false;
+        }
+        return true;
+      }
+
+      // 알림 권한 상태에 따라 폼 UI 업데이트
+      function updateFormUIBasedOnNotification() {
+        const submitButton = document.querySelector(
+          '#saju-form button[type="submit"]'
+        );
+
+        if (Notification.permission !== "granted") {
+          if (submitButton) {
+            submitButton.classList.add("disabled-notification");
+            submitButton.textContent = "🔔 먼저 알림을 허용해주세요";
+          }
+        } else {
+          if (submitButton) {
+            submitButton.classList.remove("disabled-notification");
+            submitButton.textContent = "결과 보기";
+          }
+        }
+      }
+
+      // 모든 입력 필드에 이벤트 리스너 추가
+      document.addEventListener("DOMContentLoaded", function () {
+        // 페이지 로드 시 폼 UI 상태 업데이트
+        updateFormUIBasedOnNotification();
+
+        const formInputs = document.querySelectorAll(
+          '#saju-form input:not([type="checkbox"]), #saju-form select'
+        );
+
+        formInputs.forEach((input) => {
+          input.addEventListener("focus", function () {
+            if (Notification.permission !== "granted") {
+              this.blur(); // 포커스 제거
+              checkNotificationAndGuide();
+            }
+          });
+        });
+
+        // 개인정보 동의 체크박스에 대한 별도 처리
+        const privacyCheckbox = document.getElementById("privacyConsent");
+        if (privacyCheckbox) {
+          privacyCheckbox.addEventListener("click", function (e) {
+            if (Notification.permission !== "granted") {
+              e.preventDefault(); // 체크 방지
+              checkNotificationAndGuide();
+            }
+          });
+        }
+      });
+
       // 푸시 설정 버튼 이벤트
       document
         .getElementById("push-settings-btn")
@@ -1271,12 +1363,15 @@
               const subscribed = await pushManager.subscribeToPush();
               if (subscribed) {
                 alert(
-                  "✅ 푸시 알림이 성공적으로 설정되었습니다!\n매칭이 완료되면 알림을 보내드립니다."
+                  "✅ 푸시 알림이 성공적으로 설정되었습니다!\n매칭이 완료되면 알림을 보내드립니다.\n\n이제 아래 정보를 입력하여 사주 분석을 받아보세요!"
                 );
                 // 푸시 알림 설정이 완료되면 버튼과 상태 메시지 숨기기
                 document.getElementById("push-settings-btn").style.display =
                   "none";
                 document.getElementById("push-status").style.display = "none";
+
+                // 폼 UI 업데이트 (버튼 활성화)
+                updateFormUIBasedOnNotification();
               } else {
                 alert(
                   "푸시 알림 구독에 실패했습니다.\n잠시 후 다시 시도해주세요."
@@ -1297,6 +1392,26 @@
 
       sajuForm.addEventListener("submit", async (event) => {
         event.preventDefault();
+
+        // 알림 권한 확인 - 가장 먼저 체크
+        if (Notification.permission !== "granted") {
+          alert(
+            "🔔 매칭 알림을 받기 위해 먼저 푸시 알림을 허용해주세요!\n\n위의 '푸시 알림 설정' 버튼을 클릭하여 알림을 허용한 후 다시 시도해주세요."
+          );
+          // 푸시 설정 버튼으로 스크롤
+          const pushButton = document.getElementById("push-settings-btn");
+          if (pushButton && pushButton.style.display !== "none") {
+            pushButton.scrollIntoView({ behavior: "smooth", block: "center" });
+            // 버튼 강조 효과
+            pushButton.style.animation = "pulse 1s ease-in-out 3";
+            pushButton.style.transform = "scale(1.05)";
+            setTimeout(() => {
+              pushButton.style.animation = "";
+              pushButton.style.transform = "";
+            }, 3000);
+          }
+          return;
+        }
 
         // 성별 선택 확인
         const gender = document.getElementById("gender").value;
